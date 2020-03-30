@@ -56,10 +56,17 @@ class UI:
         self.fig.suptitle("Transform")
         self.ax.set_xlabel("Frequencies")
         #self.ax.set_xlim(0, self.intermediary.transform.freqs[self.intermediary.transform.N-1])
-        self.ax.set_ylim(-1, 1)
-        his = self.intermediary.transform.getHistoryA()
-        self.ax.semilogx(self.intermediary.transform.freqs, his/max(abs(his)))
-        #self.canvas.draw()
+        plotdata = self.intermediary.transform.getHistoryA()
+        M = max(abs(plotdata))
+        if self.intermediary.scale:
+            self.ax.set_ylim(-1, 1)
+            plotdata /= M
+        else:
+            self.ax.set_ylim(-M, M)
+        if self.intermediary.logx:
+            self.ax.semilogx(self.intermediary.transform.freqs, plotdata)
+        else:
+            self.ax.plot(self.intermediary.transform.freqs, plotdata)
         self.end = time()
         print(self.end - self.start)
 
@@ -101,6 +108,17 @@ class UI:
         pause = self.builder.get_object("BPause")
         pause.bind("<Button-1>", self.intermediary.pause)
 
+        log = self.builder.get_object("CBLog")
+        log.bind("<Button-1>", self.intermediary.log_toggle)
+        log.select()
+
+        scale = self.builder.get_object("CBScale")
+        scale.bind("<Button-1>", self.intermediary.scale_toggle)
+        scale.select()
+
+        const = self.builder.get_object(("CBConst"))
+        const.bind("<Button-1>", self.intermediary.const_toggle)
+        const.select()
 
 
 if __name__ == '__main__':

@@ -345,7 +345,7 @@ class BaseAS(abc.ABC, AnalysisResultSaver, Signal):
         """Reshape transformation matrix and recalculate values"""
 
         self.N = N
-        self.A = np.ndarray([self.N, self.N])
+        self.A = np.ndarray([self.N, self.N], dtype=self.A.dtype)
         self.make_matrix()
         self.reshape_history(N)
 

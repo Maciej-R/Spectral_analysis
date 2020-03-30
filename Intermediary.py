@@ -19,6 +19,10 @@ class Intermediary:
         self.type = -1
         self.T = None
         self.play = False
+        self.logx = True
+        self.sound = False
+        self.scale = True
+        self.const = True
 #       Getting references to UI widgets
         #self.SN = self.builder.get_object("SN")
         #self.LBTransform = self.builder.get_object("TransformType")
@@ -34,6 +38,9 @@ class Intermediary:
         idx = self.builder.get_object("TransformType").curselection()
         if len(idx) > 1:
             raise RuntimeError("Too many choices from listbox")
+        if len(idx) == 0:
+            tk.messagebox.showinfo("", "Choose transform type first")
+            return
         idx = idx[0]
 #       Check if change was made
         N = int(self.builder.get_object("SN").get())
@@ -73,8 +80,8 @@ class Intermediary:
         self.transform.read_audio(pth)
 #       Time of periodic graph refresh for live audio analysis
         self.T = round(self.transform.N / self.transform.fs)
-#       Assuming 25ms for drawing
-        if self.T < 0.025:
+#       Assuming 25ms for drawing in case of constantly operating
+        if self.const and self.T < 0.025:
             self.transform.reshape(int(np.floor(0.025 * self.transform.fs)))
             self.T = np.around(self.transform.N / self.transform.fs, 3)
             SN = self.builder.get_object("SN")
@@ -95,3 +102,27 @@ class Intermediary:
         """"""
 
         self.play = False
+
+    def log_toggle(self, event):
+        """"""
+
+        if self.builder.get_variable("VarLog").get() == 0:
+            self.logx = True
+        else:
+            self.logx = False
+
+    def scale_toggle(self, event):
+        """"""
+
+        if self.builder.get_variable("VarScale").get() == 0:
+            self.scale = True
+        else:
+            self.scale = False
+
+    def const_toggle(self, event):
+        """"""
+
+        if self.builder.get_variable("VarConst").get() == 0:
+            self.const = True
+        else:
+            self.const = False

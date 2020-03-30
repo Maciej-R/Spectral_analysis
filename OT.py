@@ -84,7 +84,9 @@ class OT(Common.BaseAS):
 
     def reshape(self, N):
         """"""
-        super().reshape(N)
+        if self.transform == "Hadamard":
+            N = np.power(2, np.ceil(np.log2(N)))
+        super().reshape(int(N))
         self.freqs /= 2
 
 
