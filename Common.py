@@ -272,22 +272,24 @@ class Signal(Base):
         self.position = 0
         self.siglen = len(data)
 
-    def play(self, pre=True, whole=False):
+    def play(self, volume=1, pre=True, whole=False):
         """Function plays signal as wave sound file
            :arg pre Defines if sound is being played before of after doing analysis. In first case sound is
                     played from current position of processing otherwise it's N samples back
-            :arg whole Whether to play whole signal or N samples"""
+            :arg whole Whether to play whole signal or N samples
+            :arg volume Music amplitude is multiplied by this value"""
 
         if whole:
-            sa.play_buffer(self.signal, self.nchannels, self.sample_size, self.fs)
+            sa.play_buffer(np.asarray(self.signal[0, :] * volume, dtype=self.signal.dtype),
+                           1, self.sample_size, self.fs)
             return
 
         if pre:
-            sa.play_buffer(self.signal[0, self.position:self.position+self.N],
-                           self.nchannels, self.sample_size, self.fs)
+            sa.play_buffer(np.asarray(self.signal[0, self.position-self.N:self.position] * volume, self.signal.dtype),
+                           1, self.sample_size, self.fs)
         else:
-            sa.play_buffer(self.signal[0, self.position-self.N:self.position],
-                           self.nchannels, self.sample_size, self.fs)
+            sa.play_buffer(np.asarray(self.signal[0, self.position:self.position+self.N], self.signal.dtype),
+                           1, self.sample_size, self.fs)
 
 
 class BaseAS(abc.ABC, AnalysisResultSaver, Signal):

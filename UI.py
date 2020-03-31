@@ -4,6 +4,8 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.pyplot import subplots
 import tkinter
+from matplotlib import figure
+from PIL import Image, ImageTk
 from matplotlib.animation import FuncAnimation
 import Intermediary
 from time import time
@@ -18,62 +20,65 @@ class UI:
         self.builder = pygubu.Builder()
         #Load an ui file
         self.builder.add_from_file(pth)
-        self.intermediary = Intermediary.Intermediary(self)
+        self.intermediary = Intermediary.Intermediary(self, 8)
         # 3: Create the mainwindow
         self.mainFrame = self.builder.get_object('FrameMain')
         self.imageFrame = self.builder.get_object("GraphsFrame")
         #Matplotlib in tk frame
-        self.fig, self.ax = subplots()
+        #self.fig = figure.Figure()
+        #self.ax = self.fig.add_subplot(1, 1, 1)
 
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.imageFrame)
-        self.canvas.draw()
-        self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
+        #self.canvas = FigureCanvasTkAgg(self.fig, master=self.imageFrame)
+        #self.canvas.draw()
+        #self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
 
         #self.toolbar = NavigationToolbar2Tk(self.canvas, self.imageFrame)
         #self.toolbar.update()
         #self.canvas.get_tk_widget().pack(side=tkinter.TOP, fill=tkinter.BOTH, expand=1)
 
         self.animation = None
-        self.T = 1
+        load = Image.open("Squirrel-Hugging-Flower-Feature-SWNS.jpg")
+        render = ImageTk.PhotoImage(load)
         self.start = time()
+        img = tk.Label(self.imageFrame, image=render)
+        img.image = render
+        img.place(x=0, y=0)
         self.end = time()
+        print(self.end - self.start)
 
         #self.builder.connect_callbacks(self.intermediary)
         self.init_ui()
-        self.animation = FuncAnimation(self.fig, self.plot, interval=25)
+        self.i = 0
+        self.AT = self.builder.get_object("EAudioTime")
+
 
     def run(self):
 
         self.mainFrame.mainloop()
 
-    def plot(self, frame):
+    def plot(self, render):
+        """Function regularly called by matplotlib.animation"""
 
-        if not self.intermediary.play:
-            return
-        self.intermediary.transform.analyse()
         self.start = time()
-        self.ax.clear()
-        self.fig.suptitle("Transform")
-        self.ax.set_xlabel("Frequencies")
-        #self.ax.set_xlim(0, self.intermediary.transform.freqs[self.intermediary.transform.N-1])
-        plotdata = self.intermediary.transform.getHistoryA()
-        M = max(abs(plotdata))
-        if self.intermediary.scale:
-            self.ax.set_ylim(-1, 1)
-            plotdata /= M
-        else:
-            self.ax.set_ylim(-M, M)
-        if self.intermediary.logx:
-            self.ax.semilogx(self.intermediary.transform.freqs, plotdata)
-        else:
-            self.ax.plot(self.intermediary.transform.freqs, plotdata)
-        self.end = time()
-        print(self.end - self.start)
+        self.i += 1
+#       Clear
+        self.AT.delete(0, len(self.AT.get()))
+#       Set new value
+        self.AT.insert(0, str(self.i * self.intermediary.T))
+        img = tk.Label(self.imageFrame, image=render)
+        img.image = render
+        img.place(x=0, y=0)
+        #print(self.end - self.start)
+        self.end = self.start
+
+    def single_plot(self, plotdata):
+        """Prepare and plot data"""
+        pass
 
     def set_animation(self):
 
-        self.T = round(self.intermediary.transform.N/self.intermediary.transform.fs)
-        self.animation = FuncAnimation(self.fig, self.plot,  interval=self.T)
+        #self.intermediary.T = round(self.intermediary.transform.N/self.intermediary.transform.fs)
+        pass
 
     def stop_animaation(self):
 
@@ -119,6 +124,13 @@ class UI:
         const = self.builder.get_object(("CBConst"))
         const.bind("<Button-1>", self.intermediary.const_toggle)
         const.select()
+
+        next = self.builder.get_object("BNext")
+        next.bind("<Button-1>", self.intermediary.next)
+
+        sound = self.builder.get_object("CBSound")
+        sound.bind("<Button-1>", self.intermediary.sound_toggle)
+        sound.deselect()
 
 
 if __name__ == '__main__':
