@@ -5,12 +5,24 @@ import re
 import numpy as np
 import threading
 from time import time
-import matplotlib.pyplot as plt
 from PIL import Image, ImageTk
-
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import multiprocessing as mp
+import threading
+from tkinter import Tk
 
 class Intermediary:
     """Class provides UI with data from backend and forwards user input to backend"""
+
+    def __del__(self):
+
+        for i in range(self.nbuffs):
+            self.exchange[i]["intermediary"] = None
+            self.buffers[i].join(200)
+            if self.buffers[i].is_alive():
+                self.buffers[i].terminate()
+            print("end")
 
     def __init__(self, ui, nbuffs):
 
@@ -25,20 +37,30 @@ class Intermediary:
         self.volume = 0.2
         self.T = 1
         self.play = False
-        self.logx = True
         self.sound = False
-        self.scale = True
         self.const = True
         self.singer = None
         self.dispatcher = None
-        self.data = [[None] for i in range(self.nbuffs)]
-        self.conditions = [threading.Condition() for i in range(self.nbuffs)]
-        self.buffers = [threading.Thread(target=Render, name="Buffering", args=[self, self.conditions[i],
-                                                                                self.data[i]])
+        #self.shms = [shared_memory.SharedMemory(size=sys.getsizeof(DataExchange), create=True)]
+        self.managers = [mp.Manager() for i in range(self.nbuffs)]
+        self.exchange = list()
+        for mng in self.managers:
+            self.exchange.append(mng.dict({"ready": False, "render": None, "data": None, "position": None,
+                                           "condition": mng.Condition(), "logx": True, "scale": True,
+                                           "freqs": None}))
+#        self.exchange = [mng.dict() for mng in self.managers]
+#        self.data = [[None] for i in range(self.nbuffs)]
+#        self.positions = [0 for i in range(self.nbuffs)]
+#        self.conditions = [threading.Condition() for i in range(self.nbuffs)]
+        self.buffers = [mp.Process(target=Render, name="Buffering", args=((self.exchange[i]), ))
                         for i in range(self.nbuffs)]
+        for buf in self.buffers:
+            buf.start()
+        self.cbuff = 0
         self.pstart = time()
         self.pstop = time()
         self.cv_play = threading.Condition()
+        self.render = None
 #       Getting references to UI widgets
         #self.SN = self.builder.get_object("SN")
         #self.LBTransform = self.builder.get_object("TransformType")
@@ -74,27 +96,42 @@ class Intermediary:
         elif self.transform.N != N:
             self.transform.reshape(N)
         self.dispN()
+        self.exchange_param("freqs", self.transform.freqs)
 
     def dispatch(self):
+        """If program runs in constant audio playing mode than function calls every period
+        of refreshing forward function"""
 
-        i = 0
+        start = time()
         while self.play:
-            while time() - self.pstart < self.T - 0.0005:
+            while time() - start < self.T - 0.0005:
                 pass
-            self.transform.analyse()
-            if i % 2 == 0:
-                self.buffer1.render_fig(self.transform.getHistoryA())
-                self.ui.plot(self.buffer2.render)
-            else:
-                self.buffer2.render_fig(self.transform.getHistoryA())
-                self.ui.plot(self.buffer1.render)
-            i += 1
-            self.pstart = time()
-            #self.cv_play.acquire()
-            #self.cv_play.notify()
-            #self.cv_play.release()
-            print(self.pstop - self.pstart)
-            self.pstop = self.pstart
+            try:
+                self.forward()
+            except RuntimeError as e:
+                tk.messagebox.showerror("", e)
+                self.play = False
+                break
+            #print(time() - prev)
+            start = time()
+
+    def forward(self):
+        """Controls plotting results and operation of buffering"""
+
+        self.exchange[self.cbuff]["condition"].acquire()
+        if not self.exchange[self.cbuff]["ready"]:
+            pass  #raise RuntimeError("Buffering too slow")
+        self.ui.plot(self.exchange[self.cbuff]["render"])
+        start = time()
+        self.exchange[self.cbuff]["position"] = self.transform.N
+        self.transform.analyse()
+        self.exchange[self.cbuff]["data"] = self.transform.getHistoryA()
+        self.exchange[self.cbuff]["ready"] = False
+        self.exchange[self.cbuff]["condition"].notify()
+        self.exchange[self.cbuff]["condition"].release()
+        #print(time()-start)
+        self.cbuff += 1
+        self.cbuff %= self.nbuffs
 
     def file_selected(self, event):
         """"""
@@ -103,7 +140,8 @@ class Intermediary:
             tk.messagebox.showinfo("", "Choose transform type first")
             return
 #       Check extension and read audio file
-        pth = self.builder.get_object("Path").cget("path")
+#       self.builder.get_object("Path")
+        pth = event.widget.cget("path")
         r = re.compile(".wav$", re.IGNORECASE)
         if r.search(pth) is None:
             tk.messagebox.showerror("", "Only .wav files are allowed")
@@ -116,23 +154,25 @@ class Intermediary:
             self.transform.reshape(int(np.floor(0.025 * self.transform.fs)))
             self.T = np.around(self.transform.N / self.transform.fs, 3)
             self.dispN()
-#       Initialize buffers
-        self.init_buffers()
+#       Initialize buffers if needed else change data
+        self.exchange_param("freqs", self.transform.freqs)
+        if None is self.exchange[0]["data"]:
+            self.init_buffers()
+        else:
+            self.purge_buffers()
+
 
     def start(self, event):
-        """"""
+        """Start dispatching thread"""
 
         if self.transform is None or self.play:
             return
         self.play = True
         self.dispatcher = threading.Thread(target=self.dispatch, name="Dispatcher")
         self.dispatcher.start()
-        #self.transform.analyse()
-        #self.ui.plot(None)
-        #self.transform.play()
 
     def pause(self, event):
-        """"""
+        """Stops dispatching thread"""
 
         self.play = False
 
@@ -140,17 +180,17 @@ class Intermediary:
         """Change use of logarithmic scale indicator"""
 
         if self.builder.get_variable("VarLog").get() == 0:
-            self.logx = True
+            self.exchange_param("logx", True)
         else:
-            self.logx = False
+            self.exchange_param("logx", False)
 
     def scale_toggle(self, event):
         """Change use of scaling indicator"""
 
         if self.builder.get_variable("VarScale").get() == 0:
-            self.scale = True
+            self.exchange_param("scale", True)
         else:
-            self.scale = False
+            self.exchange_param("scale", False)
 
     def const_toggle(self, event):
         """Switch indicator between constant play or stepped"""
@@ -184,7 +224,7 @@ class Intermediary:
 
         if self.const:
             return
-        self.ui.single_plot()
+        self.forward()
 
     def sing(self):
         """Plays N music samples starting from current position in signal processing"""
@@ -197,82 +237,139 @@ class Intermediary:
             self.transform.play(self.volume, False)
 
     def init_buffers(self):
+        """Fill buffers at beginning"""
 
         for i in range(self.nbuffs):
 
-            self.buffers[i].start()
+            self.exchange[i]["position"] = self.transform.N
             self.transform.analyse()
-            self.conditions[i].acquire()
-            self.data[i][0] = self.transform.getHistoryA()
-            self.conditions[i].notify()
-            self.conditions[i].release()
+            self.exchange[i]["condition"].acquire()
+            self.exchange[i]["data"] = self.transform.getHistoryA()
+            self.exchange[i]["condition"].notify()
+            self.exchange[i]["condition"].release()
+
+    def purge_buffers(self):
+        """If buffering threads were already running call this instead of init_buffers.
+        This function fills buffers with data from new input"""
+
+        for ex in self.exchange:
+
+            ex["condition"].acquire()
+            ex.render = None
+            ex.ready = False
+            ex.position = self.transform.N
+            self.transform.analyse()
+            ex.data = self.transform.getHistoryA()
+            ex["condition"].notify()
+            ex["condition"].release()
+
+    def exchange_param(self, param, value):
+
+        for ex in self.exchange:
+
+            ex[param] = value
 
 
 class Render:
     """Prepares and stores data and render"""
 
-    def __init__(self, intermediary, cv, data):
+    def __init__(self, exchange):
         self.fig = None
         self.ax = None
-        self.render = None
         self.running = True
-        self.data = data
-        self.cv = cv
-        self.intermediary = intermediary
+        self.im = None
+        self.prev_log = False
+        self.exchange = exchange
+        self.condition = self.exchange["condition"]
+        self.data = self.exchange["data"]
+
+        self.fig = Figure()
+        #self.ax = self.fig.add_subplot(1, 1, 1)
+        #self.ax.set_xlabel("Frequencies")
+        self.fig.suptitle("Transform")
+
+        self.canvas = FigureCanvasAgg(self.fig)
+        self.canvas.draw()
+
+        self.run()
 
     def render_fig(self):
         """
         Convert a Matplotlib figure to a 4D numpy array with RGBA channels
         @return Numpy 4D array of RGBA values
         """
-        start = time()
-        self.plot(self.data[0])
 
-        # draw the renderer
-        self.fig.canvas.draw()
-
-        # Get the RGBA buffer from the figure
+        #start = time()
+        self.plot(self.exchange["data"])
+#       Draw the renderer
+        #print(time() - start)
+        #start = time()
+        self.canvas.draw()
+        #print(time() - start)
+        #Get the RGBA buffer from the figure
         w, h = self.fig.canvas.get_width_height()
-        buf = np.fromstring(self.fig.canvas.tostring_argb(), dtype=np.uint8)
+        buf = np.array(self.canvas.renderer.buffer_rgba(), dtype=np.uint8)
+        #buf = np.fromstring(self.fig.canvas.tostring_argb(), dtype=np.uint8)
         buf.shape = (w, h, 4)
-
-        # canvas.tostring_argb give pixmap in ARGB mode. Roll the ALPHA channel to have it in RGBA mode
-        buf = np.roll(buf, 3, axis=2)
-
+        #print(time() - start)
+        #canvas.tostring_argb give pixmap in ARGB mode. Roll the ALPHA channel to have it in RGBA mode
+        #buf = np.roll(buf, 3, axis=2)
         w, h, d = buf.shape
         img = Image.frombytes("RGBA", (w, h), buf.tostring())
-        self.render = ImageTk.PhotoImage(img)
-        plt.close(self.fig)
-        print(time() - start)
+        self.exchange["render"] = img
+        #print(time() - start)
+        self.fig.delaxes(self.ax)
+        #print(time() - start)
+        self.exchange["ready"] = True
+        #print(time()-start)
 
     def plot(self, plotdata):
         """"""
 
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(1, 1, 1)
-        self.fig.suptitle("Transform")
-        self.ax.set_xlabel("Frequencies")
+        self.ax = self.fig.add_subplot(111)
+        #start = time()
         M = max(abs(plotdata))
-        if self.intermediary.scale:
+        if self.exchange["scale"]:
             self.ax.set_ylim(-1, 1)
             if M < 1:
                 M = 1
             plotdata /= M
         else:
             self.ax.set_ylim(-M, M)
-        if self.intermediary.logx:
-            self.ax.semilogx(self.intermediary.transform.freqs, plotdata)
+        #print(time() - start)
+        if self.exchange["logx"]:
+            #if self.prev_log and self.im is not None:
+                #self.im.set_ydata(plotdata)
+                #self.ax.draw_aritst(self.ax.patch)
+                #self.ax.draw_artist(self.im)
+                #self.fig.canvas.update()
+                #self.fig.canvas.flush_events()
+            #else:
+            self.im = self.ax.semilogx(self.exchange["freqs"], plotdata)
+                #self.canvas.draw()
         else:
-            self.ax.plot(self.intermediary.transform.freqs, plotdata)
+            self.im = self.ax.plot(self.exchange["freqs"], plotdata)
+        #self.canvas.draw_idle()
+        #print(time() - start)
 
     def run(self):
 
-        while self.running:
-            self.cv.acquire()
-            self.cv.wait()
-            self.cv.release()
-            self.render()
+        while self.running is not None:
+            self.condition.acquire()
+            self.condition.wait()
+            self.render_fig()
+            #print(time() - start)
+            self.condition.release()
 
     def stop(self):
 
         self.running = False
+
+
+class DataExchange:
+
+    def __init__(self, transform):
+        self.logx = True
+        self.scale = True
+        self.transform = transform
+

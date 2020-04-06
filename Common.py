@@ -104,7 +104,7 @@ class AnalysisResultSaver(Base):
                 self.s_row += 1
                 self.s_row %= self.history_len
             elif t == self.SaveType.time:
-                self.time[self.t_row, 0] = X
+                self.time[0, self.t_row] = X
                 self.t_row += 1
                 self.t_row %= self.history_len
 
@@ -161,7 +161,7 @@ class AnalysisResultSaver(Base):
             elif t == self.SaveType.synthesis:
                 res = self.synthesis[self.s_row - back - 1, :]
             elif t == self.SaveType.time:
-                res = self.time[self.t_row - back - 1, :]
+                res = self.time[0, self.t_row - back - 1]
 
         finally:
 
