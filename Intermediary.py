@@ -3,32 +3,23 @@ import Fourier
 import tkinter as tk
 import re
 import numpy as np
-import threading
 from time import time
-from PIL import Image, ImageTk
+from PIL import Image
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
-import multiprocessing as mp
 import threading
-from tkinter import Tk
+from UI import Plotter
+import pyqtgraph as qg
+from PyQt5.QtCore import QRunnable, QThreadPool
+
 
 class Intermediary:
     """Class provides UI with data from backend and forwards user input to backend"""
 
-    def __del__(self):
-
-        for i in range(self.nbuffs):
-            self.exchange[i]["intermediary"] = None
-            self.buffers[i].join(200)
-            if self.buffers[i].is_alive():
-                self.buffers[i].terminate()
-            print("end")
-
-    def __init__(self, ui, nbuffs):
+    def __init__(self, ui):
 
         self.transform = None
         self.ui = ui
-        self.nbuffs = nbuffs
         self.builder = ui.builder
         self.Tlist = ["DCT-I", "DCT-II", "DCT-III", "Hadamard", "DFT", "DtFT", "FFT"]
         self.Clist = [OT.OT, OT.OT, OT.OT, OT.OT, Fourier.DFT, Fourier.DtFT, Fourier.FFT]
@@ -36,36 +27,17 @@ class Intermediary:
         self.type = -1
         self.volume = 0.2
         self.T = 1
-        self.play = False
         self.sound = False
-        self.const = True
+        self.play = False
         self.singer = None
-        self.dispatcher = None
-        #self.shms = [shared_memory.SharedMemory(size=sys.getsizeof(DataExchange), create=True)]
-        self.managers = [mp.Manager() for i in range(self.nbuffs)]
-        self.exchange = list()
-        for mng in self.managers:
-            self.exchange.append(mng.dict({"ready": False, "render": None, "data": None, "position": None,
-                                           "condition": mng.Condition(), "logx": True, "scale": True,
-                                           "freqs": None}))
-#        self.exchange = [mng.dict() for mng in self.managers]
-#        self.data = [[None] for i in range(self.nbuffs)]
-#        self.positions = [0 for i in range(self.nbuffs)]
-#        self.conditions = [threading.Condition() for i in range(self.nbuffs)]
-        self.buffers = [mp.Process(target=Render, name="Buffering", args=((self.exchange[i]), ))
-                        for i in range(self.nbuffs)]
-        for buf in self.buffers:
-            buf.start()
-        self.cbuff = 0
-        self.pstart = time()
-        self.pstop = time()
+        self.const = True
+        self.freqs = None
+        self.scale = True
+        self.logx = True
         self.cv_play = threading.Condition()
-        self.render = None
-#       Getting references to UI widgets
-        #self.SN = self.builder.get_object("SN")
-        #self.LBTransform = self.builder.get_object("TransformType")
+        self.dispatcher = threading.Thread(target=Dispatcher, args=[self.ui, self.cv_play])
 
-    def init_transform(self, str):
+    def init_transform(self, strr):
         pass
 
     def type_confirmed(self, event):
@@ -96,42 +68,7 @@ class Intermediary:
         elif self.transform.N != N:
             self.transform.reshape(N)
         self.dispN()
-        self.exchange_param("freqs", self.transform.freqs)
-
-    def dispatch(self):
-        """If program runs in constant audio playing mode than function calls every period
-        of refreshing forward function"""
-
-        start = time()
-        while self.play:
-            while time() - start < self.T - 0.0005:
-                pass
-            try:
-                self.forward()
-            except RuntimeError as e:
-                tk.messagebox.showerror("", e)
-                self.play = False
-                break
-            #print(time() - prev)
-            start = time()
-
-    def forward(self):
-        """Controls plotting results and operation of buffering"""
-
-        self.exchange[self.cbuff]["condition"].acquire()
-        if not self.exchange[self.cbuff]["ready"]:
-            pass  #raise RuntimeError("Buffering too slow")
-        self.ui.plot(self.exchange[self.cbuff]["render"])
-        start = time()
-        self.exchange[self.cbuff]["position"] = self.transform.N
-        self.transform.analyse()
-        self.exchange[self.cbuff]["data"] = self.transform.getHistoryA()
-        self.exchange[self.cbuff]["ready"] = False
-        self.exchange[self.cbuff]["condition"].notify()
-        self.exchange[self.cbuff]["condition"].release()
-        #print(time()-start)
-        self.cbuff += 1
-        self.cbuff %= self.nbuffs
+        self.freqs = self.transform.freqs
 
     def file_selected(self, event):
         """"""
@@ -155,12 +92,7 @@ class Intermediary:
             self.T = np.around(self.transform.N / self.transform.fs, 3)
             self.dispN()
 #       Initialize buffers if needed else change data
-        self.exchange_param("freqs", self.transform.freqs)
-        if None is self.exchange[0]["data"]:
-            self.init_buffers()
-        else:
-            self.purge_buffers()
-
+        self.freqs = self.transform.freqs
 
     def start(self, event):
         """Start dispatching thread"""
@@ -168,8 +100,9 @@ class Intermediary:
         if self.transform is None or self.play:
             return
         self.play = True
-        self.dispatcher = threading.Thread(target=self.dispatch, name="Dispatcher")
-        self.dispatcher.start()
+        self.cv_play.acquire()
+        self.cv_play.notify()
+        self.cv_play.release()
 
     def pause(self, event):
         """Stops dispatching thread"""
@@ -180,17 +113,17 @@ class Intermediary:
         """Change use of logarithmic scale indicator"""
 
         if self.builder.get_variable("VarLog").get() == 0:
-            self.exchange_param("logx", True)
+            self.logx = True
         else:
-            self.exchange_param("logx", False)
+            self.logx = False
 
     def scale_toggle(self, event):
         """Change use of scaling indicator"""
 
         if self.builder.get_variable("VarScale").get() == 0:
-            self.exchange_param("scale", True)
+            self.scale =  True
         else:
-            self.exchange_param("scale", False)
+            self.scale = False
 
     def const_toggle(self, event):
         """Switch indicator between constant play or stepped"""
@@ -224,7 +157,9 @@ class Intermediary:
 
         if self.const:
             return
-        self.forward()
+        self.cv_play.acquire()
+        self.cv_play.notify()
+        self.cv_play.release()
 
     def sing(self):
         """Plays N music samples starting from current position in signal processing"""
@@ -236,38 +171,58 @@ class Intermediary:
             self.cv_play.release()
             self.transform.play(self.volume, False)
 
-    def init_buffers(self):
-        """Fill buffers at beginning"""
 
-        for i in range(self.nbuffs):
 
-            self.exchange[i]["position"] = self.transform.N
-            self.transform.analyse()
-            self.exchange[i]["condition"].acquire()
-            self.exchange[i]["data"] = self.transform.getHistoryA()
-            self.exchange[i]["condition"].notify()
-            self.exchange[i]["condition"].release()
+class Dispatcher(Plotter):
 
-    def purge_buffers(self):
-        """If buffering threads were already running call this instead of init_buffers.
-        This function fills buffers with data from new input"""
+    def __init__(self, ui, condition):
 
-        for ex in self.exchange:
+        super().__init__(ui)
+        self.cv = condition
 
-            ex["condition"].acquire()
-            ex.render = None
-            ex.ready = False
-            ex.position = self.transform.N
-            self.transform.analyse()
-            ex.data = self.transform.getHistoryA()
-            ex["condition"].notify()
-            ex["condition"].release()
+    def run(self):
+        """If program runs in constant audio playing mode than function calls every period
+        of refreshing forward function"""
 
-    def exchange_param(self, param, value):
+        while True:
+            self.cv.acquire()
+            self.cv.wait()
+            self.cv.release()
+            start = time()
+            if self.intermediary.const:
+                while self.intermediary.play:
+                    while time() - start < self.intermediary.T:
+                        pass
+                    try:
+                        self.forward()
+                    except RuntimeError as e:
+                        tk.messagebox.showerror("", e)
+                        self.intermediary.play = False
+                        break
+                    start = time()
+            else:
+                self.forward()
 
-        for ex in self.exchange:
+    def forward(self):
+        """Controls plotting results and operation of buffering"""
 
-            ex[param] = value
+        self.intermediary.transform.analyse()
+        self.plot(self.intermediary.transform.getHistoryA())
+
+
+class Worker(QRunnable):
+
+    def __init__(self, ui, condition):
+
+        super(Worker, self).__init__()
+        self.dispatcher = Dispatcher(ui, condition)
+
+    def run(self):
+
+        self.dispatcher.run()
+
+
+
 
 
 class Render:

@@ -1,16 +1,9 @@
 import tkinter as tk
 import pygubu
-from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
-from matplotlib.backend_bases import key_press_handler
-from matplotlib.pyplot import subplots
-import tkinter
-from matplotlib.figure import Figure
-from PIL import Image, ImageTk
-from matplotlib.animation import FuncAnimation
 import Intermediary
+import pyqtgraph as qg
 from time import time
-import numpy as np
-import matplotlib.backends.backend_tkagg as tkagg
+from PyQt5.QtCore import QThreadPool
 
 
 class UI:
@@ -21,34 +14,21 @@ class UI:
         self.builder = pygubu.Builder()
         #Load an ui file
         self.builder.add_from_file(pth)
-        self.intermediary = Intermediary.Intermediary(self, 8)
+        self.intermediary = Intermediary.Intermediary(self)
+        #self.intermediary.dispatcher.start()
         # 3: Create the mainwindow
         self.mainFrame = self.builder.get_object('FrameMain')
-        self.imageFrame = self.builder.get_object("GraphsFrame")
-        self.img = self.builder.get_object("LImage")
-        self.photo = None
+
+        #self.WidgetPlot.setLogMode(True, False)
+        self.pool = QThreadPool()
+        self.worker = Intermediary.Worker(self, self.intermediary.cv_play)
+        self.pool.start(self.worker)
 
         self.init_ui()
-        self.i = 0
-        self.AT = self.builder.get_object("EAudioTime")
 
     def run(self):
 
         self.mainFrame.mainloop()
-
-    def plot(self, img):
-        """Function regularly called by matplotlib.animation"""
-
-        if self.photo is None:
-            self.photo = ImageTk.PhotoImage(img)
-            self.img.configure(image=self.photo)
-        else:
-            self.photo.paste(img)
-        self.i += 1
-#       Clear
-        self.AT.delete(0, len(self.AT.get()))
-#       Set new value
-        self.AT.insert(0, str(self.i * self.intermediary.T))
 
     def init_ui(self):
 
@@ -87,7 +67,7 @@ class UI:
         scale.bind("<Button-1>", self.intermediary.scale_toggle)
         scale.select()
 
-        const = self.builder.get_object(("CBConst"))
+        const = self.builder.get_object("CBConst")
         const.bind("<Button-1>", self.intermediary.const_toggle)
         const.select()
 
@@ -97,6 +77,34 @@ class UI:
         sound = self.builder.get_object("CBSound")
         sound.bind("<Button-1>", self.intermediary.sound_toggle)
         sound.deselect()
+
+
+class Plotter:
+
+    def __init__(self, ui):
+
+        self.ui = ui
+        self.intermediary = self.ui.intermediary
+
+        self.WindowGraphs = qg.GraphicsWindow()
+        self.WidgetPlot = self.WindowGraphs.addPlot()
+
+        # self.i = 0
+        # self.AT = self.ui.builder.get_object("EAudioTime")
+
+    def plot(self, data):
+        """Function regularly called by matplotlib.animation"""
+
+        start = time()
+        self.WidgetPlot.clear()
+        self.WidgetPlot.plot(self.intermediary.transform.freqs, data)
+        print(time() - start)
+
+# #       Clear
+#         self.AT.delete(0, len(self.AT.get()))
+# #       Set new value
+#         self.AT.insert(0, str(self.i * self.intermediary.T))
+#         self.i += 1
 
 
 if __name__ == '__main__':
