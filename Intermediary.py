@@ -5,12 +5,10 @@ import re
 import numpy as np
 from time import time
 from PIL import Image
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_agg import FigureCanvasAgg
 import threading
 from UI import Plotter
 import pyqtgraph as qg
-from PyQt5.QtCore import QRunnable, QThreadPool
+from P import QRunnable, QThreadPool, pyqtSlot,
 
 
 class Intermediary:
@@ -217,112 +215,8 @@ class Worker(QRunnable):
         super(Worker, self).__init__()
         self.dispatcher = Dispatcher(ui, condition)
 
+    @pyqtSlot()
     def run(self):
 
         self.dispatcher.run()
-
-
-
-
-
-class Render:
-    """Prepares and stores data and render"""
-
-    def __init__(self, exchange):
-        self.fig = None
-        self.ax = None
-        self.running = True
-        self.im = None
-        self.prev_log = False
-        self.exchange = exchange
-        self.condition = self.exchange["condition"]
-        self.data = self.exchange["data"]
-
-        self.fig = Figure()
-        #self.ax = self.fig.add_subplot(1, 1, 1)
-        #self.ax.set_xlabel("Frequencies")
-        self.fig.suptitle("Transform")
-
-        self.canvas = FigureCanvasAgg(self.fig)
-        self.canvas.draw()
-
-        self.run()
-
-    def render_fig(self):
-        """
-        Convert a Matplotlib figure to a 4D numpy array with RGBA channels
-        @return Numpy 4D array of RGBA values
-        """
-
-        #start = time()
-        self.plot(self.exchange["data"])
-#       Draw the renderer
-        #print(time() - start)
-        #start = time()
-        self.canvas.draw()
-        #print(time() - start)
-        #Get the RGBA buffer from the figure
-        w, h = self.fig.canvas.get_width_height()
-        buf = np.array(self.canvas.renderer.buffer_rgba(), dtype=np.uint8)
-        #buf = np.fromstring(self.fig.canvas.tostring_argb(), dtype=np.uint8)
-        buf.shape = (w, h, 4)
-        #print(time() - start)
-        w, h, d = buf.shape
-        img = Image.frombytes("RGBA", (w, h), buf.tostring())
-        self.exchange["render"] = img
-        #print(time() - start)
-        self.fig.delaxes(self.ax)
-        #print(time() - start)
-        self.exchange["ready"] = True
-        #print(time()-start)
-
-    def plot(self, plotdata):
-        """"""
-
-        self.ax = self.fig.add_subplot(111)
-        #start = time()
-        M = max(abs(plotdata))
-        if self.exchange["scale"]:
-            self.ax.set_ylim(-1, 1)
-            if M < 1:
-                M = 1
-            plotdata /= M
-        else:
-            self.ax.set_ylim(-M, M)
-        #print(time() - start)
-        if self.exchange["logx"]:
-            #if self.prev_log and self.im is not None:
-                #self.im.set_ydata(plotdata)
-                #self.ax.draw_aritst(self.ax.patch)
-                #self.ax.draw_artist(self.im)
-                #self.fig.canvas.update()
-                #self.fig.canvas.flush_events()
-            #else:
-            self.im = self.ax.semilogx(self.exchange["freqs"], plotdata)
-                #self.canvas.draw()
-        else:
-            self.im = self.ax.plot(self.exchange["freqs"], plotdata)
-        #self.canvas.draw_idle()
-        #print(time() - start)
-
-    def run(self):
-
-        while self.running is not None:
-            self.condition.acquire()
-            self.condition.wait()
-            self.render_fig()
-            #print(time() - start)
-            self.condition.release()
-
-    def stop(self):
-
-        self.running = False
-
-
-class DataExchange:
-
-    def __init__(self, transform):
-        self.logx = True
-        self.scale = True
-        self.transform = transform
 

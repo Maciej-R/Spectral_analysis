@@ -19,12 +19,12 @@ class UI:
         # 3: Create the mainwindow
         self.mainFrame = self.builder.get_object('FrameMain')
 
+        self.init_ui()
+
         #self.WidgetPlot.setLogMode(True, False)
         self.pool = QThreadPool()
         self.worker = Intermediary.Worker(self, self.intermediary.cv_play)
         self.pool.start(self.worker)
-
-        self.init_ui()
 
     def run(self):
 
@@ -108,7 +108,7 @@ class Plotter:
 
 
 if __name__ == '__main__':
-    path = "UI_v1.ui"
+    path = "C:\\Users\\Dell\\PycharmProjects\\UI_v1.ui"
     app = UI(path)
     app.run()
 
