@@ -8,7 +8,7 @@ from PIL import Image
 import threading
 from UI import Plotter
 import pyqtgraph as qg
-from P import QRunnable, QThreadPool, pyqtSlot,
+from PyQt5.QtCore import QRunnable, QThreadPool
 
 
 class Intermediary:
@@ -215,7 +215,6 @@ class Worker(QRunnable):
         super(Worker, self).__init__()
         self.dispatcher = Dispatcher(ui, condition)
 
-    @pyqtSlot()
     def run(self):
 
         self.dispatcher.run()
