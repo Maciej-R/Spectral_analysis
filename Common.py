@@ -6,7 +6,8 @@ import struct
 import abc
 from enum import Enum
 from time import time_ns
-from Lib import wave, copy
+import wave
+import copy
 
 
 class Base:

@@ -4,17 +4,25 @@ import tkinter as tk
 import re
 import numpy as np
 from time import time
-from PIL import Image
 import threading
-from UI import Plotter
 import pyqtgraph as qg
-from PyQt5.QtCore import QRunnable, QThreadPool
+from numpy.random import randn
+from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtCore import QThread, QThreadPool, pyqtSlot, pyqtSignal
+from PySide2.QtCore import Signal, Slot, QObject, SIGNAL, SLOT
 
 
 class Intermediary:
     """Class provides UI with data from backend and forwards user input to backend"""
 
+    instance = None
+
     def __init__(self, ui):
+
+        if Intermediary.instance is not None:
+            raise RuntimeError
+        else:
+            Intermediary.instance = self
 
         self.transform = None
         self.ui = ui
@@ -170,13 +178,42 @@ class Intermediary:
             self.transform.play(self.volume, False)
 
 
+class Plotter(QMainWindow):
 
-class Dispatcher(Plotter):
+    def __init__(self):
 
-    def __init__(self, ui, condition):
+        super().__init__()
 
-        super().__init__(ui)
+        self.WidgetPlot = qg.PlotWidget()
+        self.setCentralWidget(self.WidgetPlot)
+        self.show()
+        self.WidgetPlot.plot([1, 2], [1, 1])
+
+        # self.i = 0
+        # self.AT = self.ui.builder.get_object("EAudioTime")
+
+    def plot(self, data):
+        """Function regularly called by matplotlib.animation"""
+
+        self.WidgetPlot.clear()
+        self.WidgetPlot.plot(Intermediary.instance.transform.freqs, data)
+
+# #       Clear
+#         self.AT.delete(0, len(self.AT.get()))
+# #       Set new value
+#         self.AT.insert(0, str(self.i * self.intermediary.T))
+#         self.i += 1
+
+
+class Dispatcher(QThread):
+
+    def __init__(self, ui, condition, plotter):
+
+        super().__init__()
+        self.ui = ui
+        self.intermediary = self.ui.intermediary
         self.cv = condition
+        self.plot = plotter.plot
 
     def run(self):
         """If program runs in constant audio playing mode than function calls every period
@@ -204,18 +241,21 @@ class Dispatcher(Plotter):
     def forward(self):
         """Controls plotting results and operation of buffering"""
 
-        self.intermediary.transform.analyse()
-        self.plot(self.intermediary.transform.getHistoryA())
+        #self.intermediary.transform.analyse()
+        self.plot(randn(len(self.intermediary.transform.freqs)))
+        #self.plot(self.intermediary.transform.getHistoryA())
 
 
-class Worker(QRunnable):
+class Worker:
 
     def __init__(self, ui, condition):
 
-        super(Worker, self).__init__()
-        self.dispatcher = Dispatcher(ui, condition)
+        self.app = QApplication([])
+        self.plotter = Plotter()
+        self.dispatcher = Dispatcher(ui, condition, self.plotter)
+        self.dispatcher.start()
+        self.run()
 
     def run(self):
 
-        self.dispatcher.run()
-
+        self.app.exec_()

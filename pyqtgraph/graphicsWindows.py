@@ -12,6 +12,7 @@ from .widgets.GraphicsLayoutWidget import GraphicsLayoutWidget
 from .widgets.GraphicsView import GraphicsView
 QAPP = None
 
+
 def mkQApp():
     if QtGui.QApplication.instance() is None:
         global QAPP
