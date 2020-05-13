@@ -105,7 +105,7 @@ class AnalysisResultSaver(Base):
                 self.s_row += 1
                 self.s_row %= self.history_len
             elif t == self.SaveType.time:
-                self.time[0, self.t_row] = X
+                self.time[self.t_row, 0] = X
                 self.t_row += 1
                 self.t_row %= self.history_len
 

@@ -10,6 +10,7 @@ from numpy.random import randn
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtCore import QThread, QThreadPool, pyqtSlot, pyqtSignal
 from PySide2.QtCore import Signal, Slot, QObject, SIGNAL, SLOT
+import sys
 
 
 class Intermediary:
@@ -91,7 +92,7 @@ class Intermediary:
             return
         self.transform.read_audio(pth)
 #       Time of periodic graph refresh for live audio analysis
-        self.T = round(self.transform.N / self.transform.fs)
+        self.T = (self.transform.N / self.transform.fs)
 #       Assuming 25ms for drawing in case of constantly operating
         if self.const and self.T < 0.025:
             self.transform.reshape(int(np.floor(0.025 * self.transform.fs)))
@@ -180,23 +181,35 @@ class Intermediary:
 
 class Plotter(QMainWindow):
 
-    def __init__(self):
+    def __init__(self, ui, condition):
 
         super().__init__()
 
-        self.WidgetPlot = qg.PlotWidget()
-        self.setCentralWidget(self.WidgetPlot)
-        self.show()
-        self.WidgetPlot.plot([1, 2], [1, 1])
+        # self.WidgetPlot = qg.PlotWidget()
+        # self.setCentralWidget(self.WidgetPlot)
+        # self.show()
+        # self.WidgetPlot.plot([1, 2], [1, 1])
+        Plotter.WindowPlot = qg.GraphicsWindow()
+        Plotter.WidgetPlot = self.WindowPlot.addPlot()
+        Plotter.start = time()
+        self.w = Wrapper()
+        self.dispatcher = Dispatcher(ui, condition, self, self.w)
+        self.dispatcher.start()
 
         # self.i = 0
         # self.AT = self.ui.builder.get_object("EAudioTime")
 
-    def plot(self, data):
+    @staticmethod
+    @pyqtSlot(np.ndarray, name="plot", result="void")
+    def plot():
         """Function regularly called by matplotlib.animation"""
 
-        self.WidgetPlot.clear()
-        self.WidgetPlot.plot(Intermediary.instance.transform.freqs, data)
+        #print(time() - Plotter.start)
+        # Plotter.start = time()
+        Plotter.WidgetPlot.clear()
+        Plotter.WidgetPlot.plot(Intermediary.instance.transform.freqs, Intermediary.instance.transform.getHistoryA())
+        # Plotter.start = start
+        #print(time() - start)
 
 # #       Clear
 #         self.AT.delete(0, len(self.AT.get()))
@@ -207,13 +220,15 @@ class Plotter(QMainWindow):
 
 class Dispatcher(QThread):
 
-    def __init__(self, ui, condition, plotter):
+    def __init__(self, ui, condition, plotter, wrapper):
 
         super().__init__()
         self.ui = ui
         self.intermediary = self.ui.intermediary
         self.cv = condition
-        self.plot = plotter.plot
+        self.w = wrapper
+        self.plotter = plotter
+        self.strt= time()
 
     def run(self):
         """If program runs in constant audio playing mode than function calls every period
@@ -241,9 +256,13 @@ class Dispatcher(QThread):
     def forward(self):
         """Controls plotting results and operation of buffering"""
 
-        #self.intermediary.transform.analyse()
-        self.plot(randn(len(self.intermediary.transform.freqs)))
+        self.intermediary.transform.analyse()
+        #self.plot(randn(len(self.intermediary.transform.freqs)))
         #self.plot(self.intermediary.transform.getHistoryA())
+        print(time()-self.strt)
+        self.w.emit(SIGNAL("plot()"))
+        self.strt = time()
+        #self.plotter.plot()
 
 
 class Worker:
@@ -251,11 +270,21 @@ class Worker:
     def __init__(self, ui, condition):
 
         self.app = QApplication([])
-        self.plotter = Plotter()
-        self.dispatcher = Dispatcher(ui, condition, self.plotter)
-        self.dispatcher.start()
+        self.plotter = Plotter(ui, condition)
+        # self.w.signal.connect(self.plotter.plot)
+
         self.run()
 
     def run(self):
 
-        self.app.exec_()
+        sys.exit(self.app.exec_())
+
+
+class Wrapper(QObject):
+
+    signal = pyqtSignal(np.ndarray)
+
+    def __init__(self):
+
+        QObject.__init__(self)
+        self.connect(self, SIGNAL("plot()"), Plotter.plot)
