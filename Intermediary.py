@@ -100,6 +100,7 @@ class Intermediary:
             self.dispN()
 #       Initialize buffers if needed else change data
         self.freqs = self.transform.freqs
+        self.T = 0.015
 
     def start(self, event):
         """Start dispatching thread"""
@@ -195,6 +196,8 @@ class Plotter(QMainWindow):
         self.w = Wrapper()
         self.dispatcher = Dispatcher(ui, condition, self, self.w)
         self.dispatcher.start()
+        Plotter.data = None
+        Plotter.i = 0
 
         # self.i = 0
         # self.AT = self.ui.builder.get_object("EAudioTime")
@@ -204,12 +207,14 @@ class Plotter(QMainWindow):
     def plot():
         """Function regularly called by matplotlib.animation"""
 
-        #print(time() - Plotter.start)
-        # Plotter.start = time()
+        print("p: " + str(Plotter.i))
+        Plotter.i += 1
+        print(time() - Plotter.start)
+        Plotter.start = time()
         Plotter.WidgetPlot.clear()
-        Plotter.WidgetPlot.plot(Intermediary.instance.transform.freqs, Intermediary.instance.transform.getHistoryA())
+        Plotter.WidgetPlot.plot(Intermediary.instance.transform.freqs, Plotter.data)
         # Plotter.start = start
-        #print(time() - start)
+        #print(time() - Plotter.start)
 
 # #       Clear
 #         self.AT.delete(0, len(self.AT.get()))
@@ -229,6 +234,7 @@ class Dispatcher(QThread):
         self.w = wrapper
         self.plotter = plotter
         self.strt= time()
+        self.i = 0
 
     def run(self):
         """If program runs in constant audio playing mode than function calls every period
@@ -243,23 +249,26 @@ class Dispatcher(QThread):
                 while self.intermediary.play:
                     while time() - start < self.intermediary.T:
                         pass
+                    start = time()
                     try:
                         self.forward()
                     except RuntimeError as e:
                         tk.messagebox.showerror("", e)
                         self.intermediary.play = False
                         break
-                    start = time()
             else:
                 self.forward()
 
     def forward(self):
         """Controls plotting results and operation of buffering"""
 
+        print("f " + str(self.i))
+        self.i += 1
         self.intermediary.transform.analyse()
         #self.plot(randn(len(self.intermediary.transform.freqs)))
         #self.plot(self.intermediary.transform.getHistoryA())
-        print(time()-self.strt)
+        #print(time()-self.strt)
+        Plotter.data = self.intermediary.transform.getHistoryA()
         self.w.emit(SIGNAL("plot()"))
         self.strt = time()
         #self.plotter.plot()
