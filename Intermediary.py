@@ -41,7 +41,9 @@ class Intermediary:
         self.freqs = None
         self.scale = True
         self.logx = True
+        self.logy = True
         self.cv_play = threading.Condition()
+        self.cv_sound = threading.Condition()
         self.dispatcher = threading.Thread(target=Dispatcher, args=[self.ui, self.cv_play])
 
     def init_transform(self, strr):
@@ -73,7 +75,11 @@ class Intermediary:
                 self.transform = self.Clist[idx](100, N, self.Tlist[idx], 50, False)
 #       If N changed for the same transform type
         elif self.transform.N != N:
-            self.transform.reshape(N)
+            try:
+                self.transform.reshape(N)
+                self.T = self.transform.offset_ms
+            except RuntimeError:
+                tk.messagebox.showinfo("Wrong value", "No change made. Value too small")
         self.dispN()
         self.freqs = self.transform.freqs
 
@@ -88,19 +94,28 @@ class Intermediary:
         pth = event.widget.cget("path")
         r = re.compile(".wav$", re.IGNORECASE)
         if r.search(pth) is None:
-            tk.messagebox.showerror("", "Only .wav files are allowed")
+            tk.messagebox.showerror("Wrong file type", "Only .wav files are allowed")
             return
         self.transform.read_audio(pth)
 #       Time of periodic graph refresh for live audio analysis
-        self.T = (self.transform.N / self.transform.fs)
-#       Assuming 25ms for drawing in case of constantly operating
-        if self.const and self.T < 0.025:
-            self.transform.reshape(int(np.floor(0.025 * self.transform.fs)))
-            self.T = np.around(self.transform.N / self.transform.fs, 3)
+        self.T = self.transform.offset_ms
+#       Assuming 15ms for drawing in case of constantly operating
+        if self.const and self.T < 0.015:
+            # Count required windows size
+            cnt = int(np.floor(0.015 * self.transform.fs))
+#           Reshape to ~20ms window if is too small
+            if cnt > self.transform.N:
+                self.transform.reshape(int(np.floor(cnt * 4 / 3)))
+#           Try setting minimal refresh time
+            self.transform.set_offset_ms(15)
+            self.T = 0.015
             self.dispN()
+#       For fluent display
+        elif self.const and self.T > 0.040:
+            self.transform.set_offset_ms(40)
+            self.T = 0.040
 #       Initialize buffers if needed else change data
         self.freqs = self.transform.freqs
-        self.T = 0.015
 
     def start(self, event):
         """Start dispatching thread"""
@@ -111,6 +126,9 @@ class Intermediary:
         self.cv_play.acquire()
         self.cv_play.notify()
         self.cv_play.release()
+        self.cv_sound.acquire()
+        self.cv_sound.notify()
+        self.cv_sound.release()
 
     def pause(self, event):
         """Stops dispatching thread"""
@@ -124,6 +142,9 @@ class Intermediary:
             self.logx = True
         else:
             self.logx = False
+        #TODO logy
+        Plotter.log_mode(self.logx, False)
+
 
     def scale_toggle(self, event):
         """Change use of scaling indicator"""
@@ -146,9 +167,14 @@ class Intermediary:
 
         if self.builder.get_variable("VarSound").get() == 0:
             self.sound = True
-            self.singer = threading.Thread(target=self.sing, name="Music playing thread")
+            self.singer = ThreadE(target=self.sing, name="Music playing thread")
             self.singer.start()
         else:
+            if self.singer is not None:
+                try:
+                    self.singer.terminate()
+                except RuntimeError:
+                    pass
             self.sound = False
 
     def dispN(self):
@@ -172,15 +198,18 @@ class Intermediary:
     def sing(self):
         """Plays N music samples starting from current position in signal processing"""
 
-        #self.transform.play(self.volume, False, True)
-        while self.sound:
-            self.cv_play.acquire()
-            self.cv_play.wait()
-            self.cv_play.release()
-            self.transform.play(self.volume, False)
+        self.cv_sound.acquire()
+        self.cv_sound.wait()
+        self.cv_sound.release()
+        if self.const:
+            self.transform.play(self.volume, False, True, self.transform.position)
 
 
 class Plotter(QMainWindow):
+
+    WindowPlot = None
+    WidgetPlot = None
+    data = None
 
     def __init__(self, ui, condition):
 
@@ -212,7 +241,18 @@ class Plotter(QMainWindow):
         print(time() - Plotter.start)
         Plotter.start = time()
         Plotter.WidgetPlot.clear()
-        Plotter.WidgetPlot.plot(Intermediary.instance.transform.freqs, Plotter.data)
+        if Intermediary.instance.logy:
+            Plotter.data = 20*np.log10(np.abs(Plotter.data))
+            Plotter.WidgetPlot.setLimits(yMin=0, minYRange=120, yMax=120)
+        if Intermediary.instance.logx:
+            freqs = np.log10(Intermediary.instance.transform.freqs)
+            freqs[0] = 0  # NaN
+            Plotter.WidgetPlot.getAxis("bottom").setLogMode(True)
+        else:
+            freqs = Intermediary.instance.transform.freqs
+            Plotter.WidgetPlot.getAxis("bottom").setLogMode(False)
+        Plotter.WidgetPlot.plot(freqs, Plotter.data)
+        Plotter.WidgetPlot.show()
         # Plotter.start = start
         #print(time() - Plotter.start)
 
@@ -221,6 +261,12 @@ class Plotter(QMainWindow):
 # #       Set new value
 #         self.AT.insert(0, str(self.i * self.intermediary.T))
 #         self.i += 1
+
+    @staticmethod
+    def log_mode(ax:bool=True, ay:bool=False):
+
+        if Plotter.WidgetPlot is not None:
+            Plotter.WidgetPlot.setLogMode(ax, ay)
 
 
 class Dispatcher(QThread):
@@ -233,7 +279,7 @@ class Dispatcher(QThread):
         self.cv = condition
         self.w = wrapper
         self.plotter = plotter
-        self.strt= time()
+        self.strt = time()
         self.i = 0
 
     def run(self):
@@ -297,3 +343,10 @@ class Wrapper(QObject):
 
         QObject.__init__(self)
         self.connect(self, SIGNAL("plot()"), Plotter.plot)
+
+
+class ThreadE(threading.Thread):
+
+    def terminate(self):
+
+        raise RuntimeError

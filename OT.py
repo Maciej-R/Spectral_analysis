@@ -89,6 +89,11 @@ class OT(Common.BaseAS):
         super().reshape(int(N))
         self.freqs /= 2
 
+    def make_freqs_vec(self):
+
+        super(OT, self).make_freqs_vec()
+        self.freqs /= 2
+
 
 if __name__ == "__main__":
     f = OT(100, 8, "Hadamard")

@@ -8,6 +8,7 @@ from enum import Enum
 from time import time_ns
 import wave
 import copy
+import scipy.signal as sp
 
 
 class Base:
@@ -23,6 +24,10 @@ class Base:
         self.make_freqs_vec()
         self.A = np.ndarray([self.N, self.N], dtype=dtype)
         self.S = np.ndarray([self.N, self.N], dtype=dtype)
+        self.attenuation = 50
+        self.window = sp.windows.chebwin(self.N, self.attenuation, False)
+        self.offset = N/2
+        self.offset_ms = np.around(self.offset / self.fs, 3)
 
     def setFs(self, fs):
         """Set sampling rate"""
@@ -31,6 +36,40 @@ class Base:
     def make_freqs_vec(self):
         """Calculate vector of frequencies present in transform (orthogonal, DFT)"""
         self.freqs = np.arange(start=0, stop=self.N) / self.N * self.fs
+
+    def set_attenuation(self, att):
+        """Set desired window attenution"""
+
+        self.attenuation = att
+        self.window = sp.windows.chebwin(self.N, self.attenuation, False)
+
+    def _adjust_offset(self):
+        """
+        If parameter offset_ms is set than adjustments to match current N and fs are made.
+        Done automatically when needed
+        """
+
+        if self.offset_ms is None:
+            self.offset = int(self.N/2)
+        else:
+            tmp_offset = np.round(self.offset_ms * self.fs)
+            if tmp_offset > self.N:
+                raise RuntimeError
+            else:
+                self.offset = int(tmp_offset)
+
+    def set_offset_ms(self, offset):
+        """
+        Adjust position change to match given time restrictions.
+        Makes shifts independent from window length and sampling frequency allowing display to stay smooth
+        even if fs is low causing long refresh times with given window length.
+        Default offset is N/2 (so T = fs/N*2 where N-window length and fs-sampling frequency).
+        Doesn't start any internal timers. All actions should be triggered from outside.
+        :arg offset Time of analysis window shift in milliseconds
+        """
+
+        self.offset_ms = offset/1000
+        self._adjust_offset()
 
 
 class AnalysisResultSaver(Base):
@@ -124,25 +163,26 @@ class AnalysisResultSaver(Base):
             if ts > 1 or ta > 1 or sa > 1:
                 raise RuntimeError("History not synchronized")
 
-    def getHistoryA(self, back=0):
+    def getHistoryA(self, back=0, synchronize=False):
         """Short for getHistory(back, SaveType.analysis)"""
 
-        return self.getHistory(self.SaveType.analysis, back)
+        return self.getHistory(self.SaveType.analysis, back, synchronize)
 
-    def getHistoryS(self, back=0):
+    def getHistoryS(self, back=0, synchronize=False):
         """Short for getHistory(back, SaveType.synthesis)"""
 
-        return self.getHistory(self.SaveType.synthesis, back)
+        return self.getHistory(self.SaveType.synthesis, back, synchronize)
 
-    def getHistoryT(self, back=0):
+    def getHistoryT(self, back=0, synchronize=False):
         """Short for getHistory(back, SaveType.time)"""
 
-        return self.getHistory(self.SaveType.time, back)
+        return self.getHistory(self.SaveType.time, back, synchronize)
 
-    def getHistory(self, t, back=0):
-        """Get record from history of analysis, synchronized, thread save
+    def getHistory(self, t, back=0, synchronize=False):
+        """Get record from history of analysis
            :arg back Value from 0 to history_len-1 where 0 is latest and history_len-1 is oldest record
-           :arg t Type of history to read"""
+           :arg t Type of history to
+           :arg synchronize True if mutex should be used (introduces some delay)"""
 
 #       If no history saved
         if self.history_len == 0:
@@ -156,7 +196,8 @@ class AnalysisResultSaver(Base):
         res = None
         try:
 
-            self.mutex.acquire()
+            if synchronize:
+                self.mutex.acquire()
             if t == self.SaveType.analysis:
                 res = self.analysis[self.a_row - back - 1, :]
             elif t == self.SaveType.synthesis:
@@ -166,7 +207,7 @@ class AnalysisResultSaver(Base):
 
         finally:
 
-            if self.mutex.locked():
+            if synchronize and self.mutex.locked():
                 self.mutex.release()
 
         return res
@@ -273,15 +314,16 @@ class Signal(Base):
         self.position = 0
         self.siglen = len(data)
 
-    def play(self, volume=1, pre=True, whole=False):
+    def play(self, volume=0.2, pre=True, whole=False, start=0):
         """Function plays signal as wave sound file
            :arg pre Defines if sound is being played before of after doing analysis. In first case sound is
                     played from current position of processing otherwise it's N samples back
             :arg whole Whether to play whole signal or N samples
-            :arg volume Music amplitude is multiplied by this value"""
+            :arg volume Music amplitude is multiplied by this value
+            :arg start Starting position, relevant if whole == True"""
 
         if whole:
-            sa.play_buffer(np.asarray(self.signal[0, :] * volume, dtype=self.signal.dtype),
+            sa.play_buffer(np.asarray(self.signal[0, start:] * volume, dtype=self.signal.dtype),
                            1, self.sample_size, self.fs)
             return
 
@@ -303,7 +345,7 @@ class BaseAS(abc.ABC, AnalysisResultSaver, Signal):
            :return A*x' """
 
         if x is None:
-            #Largest index for signal
+            # Largest index for signal (slice < , ) indexing)
             end = min(self.position+self.N, self.siglen)
 #           Length of available signal
             diff = end-self.position
@@ -313,14 +355,16 @@ class BaseAS(abc.ABC, AnalysisResultSaver, Signal):
                 x = np.zeros([1, self.N])
 #               Copy available part if there's some
                 if self.position < self.siglen:
-                    x[0, 0:diff+1] = self.signal[0, self.position:end]
+                    x[0, 0:diff] = self.signal[0, self.position:end]
 #           If it's possible use only signal
             else:
                 x = self.signal[0, self.position:end]
 #           Update processing position
-            self.position += self.N
+            self.position += self.offset
 
         start = time_ns()
+        if self.window is not None:
+            x = np.multiply(x, self.window)
         X = np.dot(self.A, np.transpose(x))
         end = time_ns()
         self.saveA(X)
@@ -345,12 +389,22 @@ class BaseAS(abc.ABC, AnalysisResultSaver, Signal):
         pass
 
     def reshape(self, N):
-        """Reshape transformation matrix and recalculate values"""
+        """
+        Reshape transformation matrix, history structures, window, recalculate values,
+        adjust offset (if this fails nothing is changed, error is thrown) see set_offset_ms
+        """
 
+        old = self.N
         self.N = N
+        try:
+            self._adjust_offset()
+        except RuntimeError:
+            self.N = old
+            raise
         self.A = np.ndarray([self.N, self.N], dtype=self.A.dtype)
         self.make_matrix()
         self.reshape_history(N)
+        self.window = sp.windows.chebwin(self.N, self.attenuation, False)
 
 
 class Test(unittest.TestCase):
