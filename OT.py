@@ -74,20 +74,17 @@ class OT(Common.BaseAS):
     def read_audio(self, path):
 
         super().read_audio(path)
-        self.freqs /= 2
 
-    def read_numeric(self, data, fs, *, dtype=None, fill=False):
+    def read_numeric(self, fs, *, data=None, path=None, dtype=None, fill=False):
         """Overriding Signal function for frequency vector correction (compared to DFT it's a half)"""
 
-        super().read_numeric(data, fs,  dtype=None, fill=False)
-        self.freqs /= 2
+        super().read_numeric(fs, data=data, path=path, dtype=None, fill=False)
 
     def reshape(self, N):
         """"""
         if self.transform == "Hadamard":
             N = np.power(2, np.ceil(np.log2(N)))
         super().reshape(int(N))
-        self.freqs /= 2
 
     def make_freqs_vec(self):
 

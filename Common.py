@@ -9,6 +9,7 @@ from time import time_ns
 import wave
 import copy
 import scipy.signal as sp
+import re
 
 
 class Base:
@@ -21,13 +22,16 @@ class Base:
         self.fs = fs
         self.freqs = None
         self.position = 0
-        self.make_freqs_vec()
         self.A = np.ndarray([self.N, self.N], dtype=dtype)
         self.S = np.ndarray([self.N, self.N], dtype=dtype)
         self.attenuation = 50
         self.window = sp.windows.chebwin(self.N, self.attenuation, False)
         self.offset = N/2
         self.offset_ms = np.around(self.offset / self.fs, 3)
+        self.use_window = True
+        self.trim = False
+        self.make_freqs_vec()
+        self.finished = False
 
     def setFs(self, fs):
         """Set sampling rate"""
@@ -35,11 +39,17 @@ class Base:
 
     def make_freqs_vec(self):
         """Calculate vector of frequencies present in transform (orthogonal, DFT)"""
-        self.freqs = np.arange(start=0, stop=self.N) / self.N * self.fs
+
+        if self.trim:
+            self.freqs = np.arange(start=0, stop=int(self.N/2)) / self.N * self.fs
+        else:
+            self.freqs = np.arange(start=0, stop=self.N) / self.N * self.fs
 
     def set_attenuation(self, att):
         """Set desired window attenution"""
 
+        if att == self.attenuation:
+            return
         self.attenuation = att
         self.window = sp.windows.chebwin(self.N, self.attenuation, False)
 
@@ -70,6 +80,21 @@ class Base:
 
         self.offset_ms = offset/1000
         self._adjust_offset()
+
+    def set_trim(self, val:bool):
+        """
+        Might be used for FFT/DFT where spectrum is symmetric to cut off second half
+        """
+
+        if self.__class__.__name__ in ["FFT", "DFT"]:
+            self.trim = val
+            self.make_freqs_vec()
+        else:
+            self.trim = False
+
+    def position_time(self):
+
+        return self.position / self.fs
 
 
 class AnalysisResultSaver(Base):
@@ -129,7 +154,7 @@ class AnalysisResultSaver(Base):
             return
 
         if isinstance(X, np.ndarray) and len(X.shape) != 1:
-            X = X.reshape([len(X)])
+            X = X.reshape([X.size])
 
 #       Save date, update row index
         try:
@@ -210,6 +235,9 @@ class AnalysisResultSaver(Base):
             if synchronize and self.mutex.locked():
                 self.mutex.release()
 
+        if self.trim:
+            res = res[0:int(self.N/2)]
+
         return res
 
     def reshape_history(self, N):
@@ -221,7 +249,6 @@ class AnalysisResultSaver(Base):
             self.analysis = np.ndarray([self.history_len, N], dtype=self.dtype)
             self.synthesis = np.ndarray([self.history_len, N], dtype=self.dtype)
             self.time = np.ndarray([self.history_len, N], dtype=self.dtype)
-            self.make_freqs_vec()
 
         finally:
 
@@ -272,18 +299,58 @@ class Signal(Base):
         self.audio_data = True
         self.position = 0
         self.siglen = len(self.signal[0, :])
+        self.finished = False
 
-    def read_numeric(self, data, fs, *, dtype=None, fill=False):
+    def read_numeric(self, fs, *, data=None, path=None, dtype=None, fill=False):
         """Function imports data from numeric vector (data is deep-copied)
            :param dtype Data type to be used, if non given data.dtype is used
            :param fill If true and data length < N than fill rest with zeros (to N)
            :arg data Data source as numpy.ndarray([1, data_length]) or numpy.ndarray([length])
            :arg fs Sampling rate
+           :arg path Path to file with data
            :raises RuntimeError When data length < self.N
-           :raises TypeError When isinstance(data, np.ndarray) == False"""
+           :raises TypeError When isinstance(data, np.ndarray) == False
+           :raises AttributeError When both data and path parameters are used"""
 
-        if not isinstance(data, np.ndarray):
+        if data is not None and path is not None:
+            raise AttributeError
+
+        if data is not None and not isinstance(data, np.ndarray):
             raise TypeError("numpy.ndarray expected")
+
+        if path is not None:
+            # Single buffer size, read numbers, current buffer index, buffers list
+            bsz = 5000
+            cnt = 0
+            cbuff = -1
+            buffs = list()
+
+            with open(path, mode="r") as file:
+                # Pattern to validate file content, match numbers in float format (5.0 or 5.0e-2) or integers (5)
+                pattern = re.compile("-?\d+\.?\d*(e{1}(\+|-)+\d*)?")
+                for num in file.readline().split(" "):
+                    # Skipping number if format is improper
+                    if re.fullmatch(pattern, num) is not None:
+                        # Add another buffer in needed
+                        if cnt % bsz == 0:
+                            buffs.append(np.ndarray([1, bsz], dtype=np.float))
+                            cbuff += 1
+#                       Cast to float and save
+                        buffs[cbuff][0, cnt % bsz] = float(num)
+                        cnt += 1
+
+#           Merge buffers to one array
+            data = np.zeros([1, cnt])
+            for i in range(cbuff+1):
+                idx = i * bsz
+                if i == cbuff:
+                    end = cnt % bsz
+#                   Usually [ ; ) indexing is used but if buffer is full % will return 0, correction
+                    if end == 0:
+                        end = bsz
+                    data[0, idx:cnt] = buffs[i][0, 0:end]
+                else:
+                    data[0, idx:idx+bsz] = buffs[i][0, 0:bsz]
 
 #       If array is np.ndarray([length]) than reshape to np.ndarray([1, length])
         if len(data.shape) == 1:
@@ -300,9 +367,12 @@ class Signal(Base):
             return
 
 #       Normal case
-        self.signal = copy.deepcopy(data)
-        if dtype is not None and dtype != data.dtype:
-            self.signal = np.ndarray.astype(self.signal, dtype)
+        if path is None:
+            self.signal = copy.deepcopy(data)
+            if dtype is not None and dtype != data.dtype:
+                self.signal = np.ndarray.astype(self.signal, dtype)
+        else:
+            self.signal = data
 
 #       Set class parameters for given signal
         self.setFs(fs)
@@ -312,7 +382,8 @@ class Signal(Base):
         self.audio_data = False
         self.sample_size = self.signal.dtype.itemsize
         self.position = 0
-        self.siglen = len(data)
+        self.siglen = data.size
+        self.finished = False
 
     def play(self, volume=0.2, pre=True, whole=False, start=0):
         """Function plays signal as wave sound file
@@ -341,8 +412,16 @@ class BaseAS(abc.ABC, AnalysisResultSaver, Signal):
     def analyse(self, x=None):
         """Multiply signal x with class's orthogonal transform matrix A
            :arg x Signal vector, if None x is N samples from signal starting from self.position in signal
-                  If there's less than N samples in signal rest is 0
+                  If there's less than N samples in signal rest is 0.
+                  If whole signal has been processed then zeros vector is returned
            :return A*x' """
+
+#       If signal data is over return zeros
+        if self.finished:
+            res = np.ones([1, self.N])
+            self.saveA(res)
+            self.saveT(0)
+            return res
 
         if x is None:
             # Largest index for signal (slice < , ) indexing)
@@ -351,11 +430,12 @@ class BaseAS(abc.ABC, AnalysisResultSaver, Signal):
             diff = end-self.position
 #           If available signal is shorter than N samples
             if diff < self.N - 1:
-                #Zero initialization
+                # Zero initialization
                 x = np.zeros([1, self.N])
 #               Copy available part if there's some
                 if self.position < self.siglen:
                     x[0, 0:diff] = self.signal[0, self.position:end]
+                self.finished = True
 #           If it's possible use only signal
             else:
                 x = self.signal[0, self.position:end]
@@ -363,7 +443,7 @@ class BaseAS(abc.ABC, AnalysisResultSaver, Signal):
             self.position += self.offset
 
         start = time_ns()
-        if self.window is not None:
+        if self.use_window and self.window is not None:
             x = np.multiply(x, self.window)
         X = np.dot(self.A, np.transpose(x))
         end = time_ns()
@@ -404,6 +484,7 @@ class BaseAS(abc.ABC, AnalysisResultSaver, Signal):
         self.A = np.ndarray([self.N, self.N], dtype=self.A.dtype)
         self.make_matrix()
         self.reshape_history(N)
+        self.make_freqs_vec()
         self.window = sp.windows.chebwin(self.N, self.attenuation, False)
 
 

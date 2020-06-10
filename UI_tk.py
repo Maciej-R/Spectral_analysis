@@ -12,7 +12,6 @@ class UI:
         #Load an ui file
         self.builder.add_from_file(pth)
         self.intermediary = Intermediary.Intermediary(self)
-        #self.intermediary.dispatcher.start()
         # 3: Create the mainwindow
         self.mainFrame = self.builder.get_object('FrameMain')
 
@@ -51,13 +50,17 @@ class UI:
         pause = self.builder.get_object("BPause")
         pause.bind("<Button-1>", self.intermediary.pause)
 
-        log = self.builder.get_object("CBLog")
-        log.bind("<Button-1>", self.intermediary.log_toggle)
-        log.select()
+        logx = self.builder.get_object("CBLogX")
+        logx.bind("<Button-1>", self.intermediary.log_toggleX)
+        logx.select()
+
+        logy = self.builder.get_object("CBLogY")
+        logy.bind("<Button-1>", self.intermediary.log_toggleY)
+        logy.select()
 
         scale = self.builder.get_object("CBScale")
         scale.bind("<Button-1>", self.intermediary.scale_toggle)
-        scale.select()
+        scale.deselect()
 
         const = self.builder.get_object("CBConst")
         const.bind("<Button-1>", self.intermediary.const_toggle)
@@ -70,3 +73,15 @@ class UI:
         sound.bind("<Button-1>", self.intermediary.sound_toggle)
         sound.deselect()
 
+        use_window = self.builder.get_object("CBUse")
+        use_window.bind("<Button-1>", self.intermediary.window_toggle)
+        use_window.select()
+
+        trim = self.builder.get_object("CBTrim")
+        trim.bind("<Button-1>", self.intermediary.trim_toggle)
+
+        reset = self.builder.get_object("BReset")
+        reset.bind("<Button-1>", self.intermediary.reset)
+
+        change = self.builder.get_object("BChange")
+        change.bind("<Button-1>", self.intermediary.attenuation_change)

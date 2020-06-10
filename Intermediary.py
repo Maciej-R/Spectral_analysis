@@ -6,11 +6,13 @@ import numpy as np
 from time import time
 import threading
 import pyqtgraph as qg
-from numpy.random import randn
 from PyQt5.QtWidgets import QApplication, QMainWindow
-from PyQt5.QtCore import QThread, QThreadPool, pyqtSlot, pyqtSignal
-from PySide2.QtCore import Signal, Slot, QObject, SIGNAL, SLOT
+from PyQt5.QtCore import QThread, pyqtSlot, pyqtSignal
+from PySide2.QtCore import QObject, SIGNAL
 import sys
+from time import sleep
+from tkinter.messagebox import showinfo, showerror
+from os.path import exists
 
 
 class Intermediary:
@@ -39,7 +41,7 @@ class Intermediary:
         self.singer = None
         self.const = True
         self.freqs = None
-        self.scale = True
+        self.scale = False
         self.logx = True
         self.logy = True
         self.cv_play = threading.Condition()
@@ -58,7 +60,7 @@ class Intermediary:
         if len(idx) > 1:
             raise RuntimeError("Too many choices from listbox")
         if len(idx) == 0:
-            tk.messagebox.showinfo("", "Choose transform type first")
+            showinfo("", "Choose transform type first")
             return
         idx = idx[0]
 #       Check if change was made
@@ -79,24 +81,44 @@ class Intermediary:
                 self.transform.reshape(N)
                 self.T = self.transform.offset_ms
             except RuntimeError:
-                tk.messagebox.showinfo("Wrong value", "No change made. Value too small")
+                showinfo("Wrong value", "No change made. Value too small")
         self.dispN()
         self.freqs = self.transform.freqs
+#       Check if custom attenuation value is given
+        self.attenuation_change(None)
+#       Check if file was given before
+        pth = self.builder.get_object("Path").cget("path")
+        if exists(pth):
+            self.file_selected(None, pth)
 
-    def file_selected(self, event):
+    def file_selected(self, event, pth=None):
         """"""
 #       Check if transform class exists. If not prompt and return
         if self.transform is None:
-            tk.messagebox.showinfo("", "Choose transform type first")
+            showinfo("", "Choose transform")
             return
-#       Check extension and read audio file
-#       self.builder.get_object("Path")
-        pth = event.widget.cget("path")
+#       Check extension and decide on read type
+        if pth is None:
+            pth = event.widget.cget("path")
         r = re.compile(".wav$", re.IGNORECASE)
+        numeric = False
+#       If it's wave file audio read is performed otherwise file is treated as numeric
         if r.search(pth) is None:
-            tk.messagebox.showerror("Wrong file type", "Only .wav files are allowed")
-            return
-        self.transform.read_audio(pth)
+            numeric = True
+        if numeric:
+            # Getting fs value
+            try:
+                fs = int(self.builder.get_object("SNumericFs").get())
+                if fs <= 0:
+                    fs = 1000
+            except ValueError:
+                showerror("Parse error", "Wrong format of sampling frequency for numeric files\nDefault 1000, might"
+                                         " be changed by setting value in box and confirming with enter")
+                fs = 1000
+            self.transform.read_numeric(fs, path=pth)
+            self.dispFs()
+        else:
+            self.transform.read_audio(pth)
 #       Time of periodic graph refresh for live audio analysis
         self.T = self.transform.offset_ms
 #       Assuming 15ms for drawing in case of constantly operating
@@ -135,16 +157,28 @@ class Intermediary:
 
         self.play = False
 
-    def log_toggle(self, event):
+    def log_toggleX(self, event):
         """Change use of logarithmic scale indicator"""
 
-        if self.builder.get_variable("VarLog").get() == 0:
+        if self.builder.get_variable("VarLogX").get() == 0:
             self.logx = True
         else:
             self.logx = False
-        #TODO logy
-        Plotter.log_mode(self.logx, False)
 
+        Plotter.log_mode(self.logx, self.logy)
+
+    def log_toggleY(self, event):
+        """Change use of logarithmic scale indicator"""
+
+        if self.builder.get_variable("VarLogY").get() == 0:
+            self.logy = True
+            self.builder.get_object("CBScale").deselect()
+            self.scale = False
+        else:
+            self.logy = False
+            self.builder.get_object("CBScale").select()
+            self.scale = True
+        Plotter.log_mode(self.logx, self.logy)
 
     def scale_toggle(self, event):
         """Change use of scaling indicator"""
@@ -177,6 +211,67 @@ class Intermediary:
                     pass
             self.sound = False
 
+    def window_toggle(self, event):
+
+        if self.transform is None:
+            return
+        if self.builder.get_variable("VarUse").get() == 0:
+            self.transform.use_window = True
+        else:
+            self.transform.use_window = False
+
+    def trim_toggle(self, event):
+
+        if self.transform is None:
+            return
+        if self.builder.get_variable("VarTrim").get() == 0:
+            self.transform.set_trim(True)
+        else:
+            self.transform.set_trim(False)
+
+    def reset(self, event):
+
+        self.play = False
+        self.transform = None
+        self.type = -1
+        self.volume = 0.2
+        self.T = 1
+        self.sound = False
+        if self.singer is not None:
+            try:
+                self.singer.terminate()
+            except RuntimeError:
+                pass
+        self.singer = None
+        self.const = True
+        self.freqs = None
+        self.scale = False
+        self.logx = True
+        self.logy = True
+        self.ui.builder.get_object("Volume").set(0.2)
+        self.ui.builder.get_object("CBSound").deselect()
+        self.ui.builder.get_object("CBLogX").select()
+        self.ui.builder.get_object("CBLogY").select()
+        self.ui.builder.get_object("CBScale").deselect()
+        self.ui.builder.get_object("CBTrim").deselect()
+        self.ui.builder.get_object("CBConst").select()
+        self.ui.builder.get_object("CBUse").select()
+        self.builder.get_object("Path").configure(path="")
+        self.builder.get_object("SN").configure(values=1000)
+        self.dispAtt(50)
+        Plotter.reset()
+
+    def attenuation_change(self, event):
+
+        if self.transform is None:
+            return
+        try:
+            self.transform.set_attenuation(int(self.builder.get_object("EAttenuation").get()))
+        except ValueError:
+            showinfo("Wrong attenuation value, setting default 50")
+            self.transform.set_attenuation(50)
+            self.dispAtt(50)
+
     def dispN(self):
         """Corrects displayed number of samples per operation. Used when calculations
         force diffrent N than set by user"""
@@ -186,6 +281,21 @@ class Intermediary:
         SN.delete(0, len(SN.get()))
 #       Set new value
         SN.insert(0, str(self.transform.N))
+
+    def dispAtt(self, val):
+
+        eatt = self.builder.get_object("EAttenuation")
+        eatt.delete(0, tk.END)
+        eatt.insert(0, str(val))
+
+    def dispFs(self):
+
+        self.builder.get_object("SNumericFs")
+        spin = self.builder.get_object("SNumericFs")
+#       Clear
+        spin.delete(0, tk.END)
+#       Set new value
+        spin.insert(0, str(self.transform.N))
 
     def next(self, event):
 
@@ -215,10 +325,6 @@ class Plotter(QMainWindow):
 
         super().__init__()
 
-        # self.WidgetPlot = qg.PlotWidget()
-        # self.setCentralWidget(self.WidgetPlot)
-        # self.show()
-        # self.WidgetPlot.plot([1, 2], [1, 1])
         Plotter.WindowPlot = qg.GraphicsWindow()
         Plotter.WidgetPlot = self.WindowPlot.addPlot()
         Plotter.start = time()
@@ -227,9 +333,8 @@ class Plotter(QMainWindow):
         self.dispatcher.start()
         Plotter.data = None
         Plotter.i = 0
-
-        # self.i = 0
-        # self.AT = self.ui.builder.get_object("EAudioTime")
+        Plotter.log_mode(True, True)
+        Plotter.AT = Intermediary.instance.ui.builder.get_object("LAudioTimeVal")
 
     @staticmethod
     @pyqtSlot(np.ndarray, name="plot", result="void")
@@ -243,30 +348,41 @@ class Plotter(QMainWindow):
         Plotter.WidgetPlot.clear()
         if Intermediary.instance.logy:
             Plotter.data = 20*np.log10(np.abs(Plotter.data))
-            Plotter.WidgetPlot.setLimits(yMin=0, minYRange=120, yMax=120)
+            np.nan_to_num(Plotter.data, False, nan=0.0)
+        elif Intermediary.instance.scale:
+            M = np.max(np.abs(Plotter.data))
+            Plotter.WidgetPlot.setLimits(yMin=-M, yMax=M, minYRange=2*M)
         if Intermediary.instance.logx:
             freqs = np.log10(Intermediary.instance.transform.freqs)
             freqs[0] = 0  # NaN
-            Plotter.WidgetPlot.getAxis("bottom").setLogMode(True)
         else:
             freqs = Intermediary.instance.transform.freqs
-            Plotter.WidgetPlot.getAxis("bottom").setLogMode(False)
         Plotter.WidgetPlot.plot(freqs, Plotter.data)
         Plotter.WidgetPlot.show()
         # Plotter.start = start
         #print(time() - Plotter.start)
 
-# #       Clear
-#         self.AT.delete(0, len(self.AT.get()))
-# #       Set new value
-#         self.AT.insert(0, str(self.i * self.intermediary.T))
-#         self.i += 1
+        Plotter.AT.configure(text=str(Intermediary.instance.transform.position_time()))
 
     @staticmethod
-    def log_mode(ax:bool=True, ay:bool=False):
+    def log_mode(ax:bool=None, ay:bool=None):
 
         if Plotter.WidgetPlot is not None:
-            Plotter.WidgetPlot.setLogMode(ax, ay)
+            if ax is not None:
+                Plotter.WidgetPlot.getAxis("bottom").setLogMode(ax)
+            if ay is not None:
+                if ay:
+                    Plotter.WidgetPlot.enableAutoRange(qg.ViewBox.YAxis, False)
+                    Plotter.WidgetPlot.getAxis("left").setTickSpacing()
+                    Plotter.WidgetPlot.setLimits(yMin=0, minYRange=120, yMax=120)
+                else:
+                    Plotter.WidgetPlot.getAxis("left").setTickSpacing(levels=[])
+                    Plotter.WidgetPlot.enableAutoRange(qg.ViewBox.YAxis, True)
+
+    @staticmethod
+    def reset():
+
+        Plotter.AT.configure(text=str(0))
 
 
 class Dispatcher(QThread):
@@ -294,7 +410,11 @@ class Dispatcher(QThread):
             if self.intermediary.const:
                 while self.intermediary.play:
                     while time() - start < self.intermediary.T:
-                        pass
+                        time_left = self.intermediary.T - time() + start
+                        if time_left > 0.005:
+                            sleep(time_left - 0.002)
+                        else:
+                            pass
                     start = time()
                     try:
                         self.forward()
@@ -311,13 +431,14 @@ class Dispatcher(QThread):
         print("f " + str(self.i))
         self.i += 1
         self.intermediary.transform.analyse()
-        #self.plot(randn(len(self.intermediary.transform.freqs)))
-        #self.plot(self.intermediary.transform.getHistoryA())
-        #print(time()-self.strt)
         Plotter.data = self.intermediary.transform.getHistoryA()
+        if Plotter.data.dtype == np.complex:
+            Plotter.data = np.abs(Plotter.data)
         self.w.emit(SIGNAL("plot()"))
+        if self.intermediary.transform.finished:
+            self.intermediary.play = False
+            showinfo("", "End of file")
         self.strt = time()
-        #self.plotter.plot()
 
 
 class Worker:
@@ -326,7 +447,6 @@ class Worker:
 
         self.app = QApplication([])
         self.plotter = Plotter(ui, condition)
-        # self.w.signal.connect(self.plotter.plot)
 
         self.run()
 
