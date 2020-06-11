@@ -309,6 +309,11 @@ class Intermediary:
         else:
             self.bar = False
 
+    def volume_change(self, event):
+        """Set new volume value"""
+
+        self.volume = event.widget.get()
+
     def reset(self, event):
         """Restoring default state"""
 

@@ -95,3 +95,6 @@ class UI:
 
         bar = self.builder.get_object("CBBar")
         bar.bind("<Button-1>", self.intermediary.bar_toggle)
+
+        volume = self.builder.get_object("Volume")
+        volume.bind("<ButtonRelease-1>", self.intermediary.volume_change)
