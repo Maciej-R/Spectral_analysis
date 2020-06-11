@@ -36,6 +36,7 @@ class Base:
     def setFs(self, fs):
         """Set sampling rate"""
         self.fs = fs
+        self.offset_ms = np.around(self.offset / self.fs, 3)
 
     def make_freqs_vec(self):
         """Calculate vector of frequencies present in transform (orthogonal, DFT)"""
@@ -64,6 +65,7 @@ class Base:
         else:
             tmp_offset = np.round(self.offset_ms * self.fs)
             if tmp_offset > self.N:
+                self.offset_ms = np.around(self.offset / self.fs, 3)
                 raise RuntimeError
             else:
                 self.offset = int(tmp_offset)
@@ -301,16 +303,18 @@ class Signal(Base):
         self.siglen = len(self.signal[0, :])
         self.finished = False
 
-    def read_numeric(self, fs, *, data=None, path=None, dtype=None, fill=False):
+    def read_numeric(self, fs, *, data=None, path=None, dtype=None, fill=False, error=True):
         """Function imports data from numeric vector (data is deep-copied)
            :param dtype Data type to be used, if non given data.dtype is used
            :param fill If true and data length < N than fill rest with zeros (to N)
            :arg data Data source as numpy.ndarray([1, data_length]) or numpy.ndarray([length])
            :arg fs Sampling rate
            :arg path Path to file with data
+           :arg error Should errors be raised when number have wrong format in input file
            :raises RuntimeError When data length < self.N
            :raises TypeError When isinstance(data, np.ndarray) == False
-           :raises AttributeError When both data and path parameters are used"""
+           :raises AttributeError When both data and path parameters are used
+           :raises RuntimeError If error param is True and values in input file have wrong format"""
 
         if data is not None and path is not None:
             raise AttributeError
@@ -338,6 +342,8 @@ class Signal(Base):
 #                       Cast to float and save
                         buffs[cbuff][0, cnt % bsz] = float(num)
                         cnt += 1
+                    elif error:
+                        raise RuntimeError
 
 #           Merge buffers to one array
             data = np.zeros([1, cnt])
@@ -391,19 +397,22 @@ class Signal(Base):
                     played from current position of processing otherwise it's N samples back
             :arg whole Whether to play whole signal or N samples
             :arg volume Music amplitude is multiplied by this value
-            :arg start Starting position, relevant if whole == True"""
+            :arg start Starting position, relevant if whole == True
+            :return PlayObject"""
 
         if whole:
-            sa.play_buffer(np.asarray(self.signal[0, start:] * volume, dtype=self.signal.dtype),
-                           1, self.sample_size, self.fs)
-            return
+            obj = sa.play_buffer(np.asarray(self.signal[0, start:] * volume, dtype=self.signal.dtype),
+                                 1, self.sample_size, self.fs)
+            return obj
 
         if pre:
-            sa.play_buffer(np.asarray(self.signal[0, self.position-self.N:self.position] * volume, self.signal.dtype),
-                           1, self.sample_size, self.fs)
+            obj = sa.play_buffer(np.asarray(self.signal[0, self.position-self.N:self.position] * volume, self.signal.dtype),
+                                 1, self.sample_size, self.fs)
         else:
-            sa.play_buffer(np.asarray(self.signal[0, self.position:self.position+self.N], self.signal.dtype),
-                           1, self.sample_size, self.fs)
+            obj = sa.play_buffer(np.asarray(self.signal[0, self.position:self.position+self.N], self.signal.dtype),
+                                 1, self.sample_size, self.fs)
+
+        return obj
 
 
 class BaseAS(abc.ABC, AnalysisResultSaver, Signal):

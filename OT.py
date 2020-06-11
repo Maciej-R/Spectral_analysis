@@ -13,12 +13,12 @@ class OT(Common.BaseAS):
 
         super().__init__(fs, N, history_len, strict)
 
+        self.transform = transform
+
         if transform == "Hadamard":
             res = np.log2(N)
             if res - np.round(res) != 0:
-                print("Wrong N for Hadamard transform")
-
-        self.transform = transform
+                self.reshape(np.power(2, np.ceil(res)))
 
         self.make_matrix()
         self.S = np.transpose(self.A)
@@ -28,6 +28,7 @@ class OT(Common.BaseAS):
 
         n = np.arange(self.N)
 
+#       Calculations
         if self.transform == "DCT-I":
             for k in range(0, self.N):
                 self.A[k, :] = (np.cos(np.pi*k*n/self.N))
@@ -49,39 +50,32 @@ class OT(Common.BaseAS):
             self.A[:, 1:self.N - 1] *= np.sqrt(2)
 
         elif self.transform == "Hadamard":
-            M = int(np.log2(self.N))
-
+            # Length of bit representation
+            M = int(np.ceil(np.log2(self.N)))
             f = np.ndarray([self.N, self.N])
+#           Saving results to reduce computational cost
             ns = np.ndarray([self.N, M])
             for k in range(self.N):
-                kb = np.zeros([1, M])
-                kr = bin(k)[2:]
-                kb[0, -len(kr):] = [int(x) for x in kr]
-                #ks = [np.power(2, i)*kb[i] for i in range(min(M, len(kb)))]
-                #ks[len(ks):M-1] = np.zeros([1, M-1-len(ks)]);
+                if k == 0:
+                    kb = np.zeros([1, M])
+                else:
+                    kb[0, :] = ns[k, :]
                 for n in range(self.N):
+                    # First time calculation and result saving
                     if k == 0:
+                        # Bit representation of n as array of integers
                         nb = np.zeros([1, M])
                         nr = bin(n)[2:]
                         nb[0, -len(nr):] = [int(x) for x in nr]
                         ns[n, :] = nb
-                        #ns[n] = [np.power(2, i)*nb[i] for i in range(min(M, len(nb)))]
-                        #ns[len(ns):M - 1] = np.zeros([1, M - 1 - len(ns)]);
+                    # Value
                     f[k, n] = sum(np.multiply(kb[0, :], ns[n, :]))
                     self.A[k, n] = np.power(-1, f[k, n])
-            self.A /= np.sqrt(self.N)
-
-    def read_audio(self, path):
-
-        super().read_audio(path)
-
-    def read_numeric(self, fs, *, data=None, path=None, dtype=None, fill=False):
-        """Overriding Signal function for frequency vector correction (compared to DFT it's a half)"""
-
-        super().read_numeric(fs, data=data, path=path, dtype=None, fill=False)
+            self.A /= np.power(2, M/2)
 
     def reshape(self, N):
-        """"""
+        """If Hadamard transform chosen then make sure size is power of 2"""
+
         if self.transform == "Hadamard":
             N = np.power(2, np.ceil(np.log2(N)))
         super().reshape(int(N))

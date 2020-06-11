@@ -4,24 +4,29 @@ import Intermediary
 
 
 class UI:
+    """GUI"""
 
     def __init__(self, pth, cnd):
+        """Initialize GUI"""
 
-        #pygubu builder
+        # pygubu builder
         self.builder = pygubu.Builder()
-        #Load an ui file
+        # Load an ui file
         self.builder.add_from_file(pth)
         self.intermediary = Intermediary.Intermediary(self)
-        # 3: Create the mainwindow
+        # Create the mainwindow
         self.mainFrame = self.builder.get_object('FrameMain')
 
         self.init_ui()
+#        Notify about finished initialization
         cnd.acquire()
         cnd.notify()
         cnd.release()
+#       Run GUI
         self.mainFrame.mainloop()
 
     def init_ui(self):
+        """Setting parameters, adding listeners"""
 
         slider = self.builder.get_object("Volume")
         slider.to = 1
@@ -31,12 +36,14 @@ class UI:
         self.add_listeners()
 
     def list_transforms(self):
+        """Listing available transform in listbox"""
 
         Ltransforms = self.builder.get_object("TransformType")
         for entry in self.intermediary.Tlist:
             Ltransforms.insert(tk.END, entry)
 
     def add_listeners(self):
+        """Connect event listeners to GUI elements"""
 
         confirm = self.builder.get_object("BConfirm")
         confirm.bind("<Button-1>", self.intermediary.type_confirmed)
@@ -85,3 +92,6 @@ class UI:
 
         change = self.builder.get_object("BChange")
         change.bind("<Button-1>", self.intermediary.attenuation_change)
+
+        bar = self.builder.get_object("CBBar")
+        bar.bind("<Button-1>", self.intermediary.bar_toggle)

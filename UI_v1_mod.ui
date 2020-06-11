@@ -1,0 +1,550 @@
+<?xml version='1.0' encoding='utf-8'?>
+<interface version="1.0">
+  <object class="tk.Frame" id="FrameMain">
+    <property name="height">300</property>
+    <property name="width">200</property>
+    <layout manager="grid">
+      <property name="column">0</property>
+      <property name="propagate">True</property>
+      <property name="row">0</property>
+    </layout>
+    <child>
+      <object class="tk.LabelFrame" id="FrameOptions">
+        <property name="font">TkDefaultFont</property>
+        <property name="height">500</property>
+        <property name="takefocus">true</property>
+        <property name="text" translatable="yes">Options</property>
+        <property name="width">640</property>
+        <layout manager="grid">
+          <property name="column">1</property>
+          <property name="columnspan">1</property>
+          <property name="ipadx">0</property>
+          <property name="pady">0</property>
+          <property name="propagate">True</property>
+          <property name="row">0</property>
+          <property name="rowspan">1</property>
+          <property name="sticky">s</property>
+        </layout>
+        <child>
+          <object class="tk.LabelFrame" id="FrameDisplayOptions">
+            <property name="height">200</property>
+            <property name="text" translatable="yes">Display</property>
+            <property name="width">200</property>
+            <layout manager="grid">
+              <property name="propagate">True</property>
+            </layout>
+            <child>
+              <object class="tk.Checkbutton" id="CBLogX">
+                <property name="font">TkDefaultFont</property>
+                <property name="text" translatable="yes">Logarithmic frequencies</property>
+                <property name="variable">int:VarLogX</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">17</property>
+                  <property name="propagate">True</property>
+                  <property name="row">1</property>
+                  <property name="sticky">w</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Checkbutton" id="CBLogY">
+                <property name="text" translatable="yes">Logarithmic values</property>
+                <property name="variable">int:VarLogY</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">17</property>
+                  <property name="propagate">True</property>
+                  <property name="row">2</property>
+                  <property name="sticky">w</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Checkbutton" id="CBScale">
+                <property name="justify">left</property>
+                <property name="text" translatable="yes">Scaling</property>
+                <property name="variable">int:VarScale</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">17</property>
+                  <property name="propagate">True</property>
+                  <property name="row">3</property>
+                  <property name="sticky">w</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Checkbutton" id="CBTrim">
+                <property name="justify">left</property>
+                <property name="offrelief">raised</property>
+                <property name="relief">flat</property>
+                <property name="text" translatable="yes">Trim frequencies</property>
+                <property name="variable">int:VarTrim</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">17</property>
+                  <property name="propagate">True</property>
+                  <property name="row">4</property>
+                  <property name="sticky">w</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Checkbutton" id="CBBar">
+                <property name="justify">left</property>
+                <property name="offrelief">raised</property>
+                <property name="relief">flat</property>
+                <property name="text" translatable="yes">Use bar plot</property>
+                <property name="variable">int:VarBar</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">17</property>
+                  <property name="propagate">True</property>
+                  <property name="row">5</property>
+                  <property name="sticky">w</property>
+                </layout>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="tk.LabelFrame" id="FrameSound">
+            <property name="height">200</property>
+            <property name="text" translatable="yes">Sound</property>
+            <property name="width">200</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="propagate">True</property>
+              <property name="row">3</property>
+              <property type="row" id="3" name="padx">0</property>
+            </layout>
+            <child>
+              <object class="tk.Scale" id="Volume">
+                <property name="bigincrement">0.1</property>
+                <property name="digits">3</property>
+                <property name="from_">0</property>
+                <property name="label" translatable="yes">Volume</property>
+                <property name="orient">horizontal</property>
+                <property name="relief">flat</property>
+                <property name="resolution">0.01</property>
+                <property name="showvalue">true</property>
+                <property name="state">normal</property>
+                <property name="takefocus">false</property>
+                <property name="to">1</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">57</property>
+                  <property name="propagate">True</property>
+                  <property name="row">9</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Checkbutton" id="CBSound">
+                <property name="takefocus">false</property>
+                <property name="text" translatable="yes">Sound ON</property>
+                <property name="variable">int:VarSound</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">55</property>
+                  <property name="propagate">True</property>
+                  <property name="row">10</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Checkbutton" id="CBConst">
+                <property name="text" translatable="yes">Constant play</property>
+                <property name="variable">int:VarConst</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="propagate">True</property>
+                  <property name="row">11</property>
+                </layout>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Labelframe" id="FrameAnalysis">
+            <property name="height">200</property>
+            <property name="text" translatable="yes">Analysis</property>
+            <property name="width">200</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="propagate">True</property>
+              <property name="row">4</property>
+            </layout>
+            <child>
+              <object class="ttk.Label" id="label_1">
+                <property name="text" translatable="yes">Using Chebyshev window</property>
+                <layout manager="pack">
+                  <property name="propagate">True</property>
+                  <property name="sticky">n</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Label" id="LAttenutaion">
+                <property name="text" translatable="yes">Attenuation:</property>
+                <layout manager="pack">
+                  <property name="padx">68</property>
+                  <property name="propagate">True</property>
+                  <property name="sticky">n</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Entry" id="EAttenuation">
+                <property name="text" translatable="yes">50</property>
+                <layout manager="pack">
+                  <property name="propagate">True</property>
+                  <property name="sticky">n</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Checkbutton" id="CBUse">
+                <property name="text" translatable="yes">Use</property>
+                <property name="variable">int:VarUse</property>
+                <layout manager="pack">
+                  <property name="propagate">True</property>
+                  <property name="sticky">n</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Button" id="BChange">
+                <property name="text" translatable="yes">Change</property>
+                <layout manager="pack">
+                  <property name="propagate">True</property>
+                </layout>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="tk.Frame" id="FrameLeft">
+        <property name="height">200</property>
+        <property name="width">200</property>
+        <layout manager="grid">
+          <property name="column">0</property>
+          <property name="columnspan">1</property>
+          <property name="padx">10</property>
+          <property name="propagate">True</property>
+          <property name="row">0</property>
+          <property name="rowspan">2</property>
+          <property name="sticky">w</property>
+        </layout>
+        <child>
+          <object class="tk.LabelFrame" id="LabelFrame_7">
+            <property name="height">200</property>
+            <property name="text" translatable="yes">General</property>
+            <property name="width">200</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="columnspan">1</property>
+              <property name="pady">0</property>
+              <property name="propagate">True</property>
+              <property name="row">0</property>
+              <property name="rowspan">2</property>
+            </layout>
+            <child>
+              <object class="tk.Label" id="LTranformType">
+                <property name="font">TkDefaultFont</property>
+                <property name="justify">center</property>
+                <property name="relief">flat</property>
+                <property name="takefocus">false</property>
+                <property name="text" translatable="yes">Transform Type</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="propagate">True</property>
+                  <property name="row">0</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Listbox" id="TransformType">
+                <property name="activestyle">none</property>
+                <property name="listvariable">string:["Hadamard", "DCT-I", , "DCT-II", , "DCT-III", "DCT", "DtFT", "FFT"]</property>
+                <property name="relief">flat</property>
+                <property name="selectmode">single</property>
+                <property name="state">normal</property>
+                <property name="takefocus">true</property>
+                <property name="width">18</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="propagate">True</property>
+                  <property name="row">1</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Label" id="LN">
+                <property name="relief">flat</property>
+                <property name="state">normal</property>
+                <property name="takefocus">true</property>
+                <property name="text" translatable="yes">Number of samples per operation</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">8</property>
+                  <property name="propagate">True</property>
+                  <property name="row">2</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Spinbox" id="SN">
+                <property name="buttoncursor">boat</property>
+                <property name="exportselection">true</property>
+                <property name="from_">100</property>
+                <property name="increment">10</property>
+                <property name="takefocus">true</property>
+                <property name="to">10000</property>
+                <property name="values">1000</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">5</property>
+                  <property name="pady">5</property>
+                  <property name="propagate">True</property>
+                  <property name="row">3</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Button" id="BConfirm">
+                <property name="command">Intermediary.Intermediary.type_confirmed</property>
+                <property name="default">normal</property>
+                <property name="text" translatable="yes">Confirm</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="pady">5</property>
+                  <property name="propagate">True</property>
+                  <property name="row">4</property>
+                </layout>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="tk.LabelFrame" id="FrameFile">
+            <property name="height">200</property>
+            <property name="text" translatable="yes">Input file</property>
+            <property name="width">200</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="pady">5</property>
+              <property name="propagate">True</property>
+              <property name="row">4</property>
+            </layout>
+            <child>
+              <object class="pygubu.builder.widgets.pathchooserinput" id="Path">
+                <property name="type">file</property>
+                <bind sequence="&lt;&lt;PathChooserPathChanged&gt;&gt;" handler="file_selected" add="True" />
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">15</property>
+                  <property name="propagate">True</property>
+                  <property name="row">0</property>
+                </layout>
+              </object>
+            </child>
+          </object>
+        </child>
+        <child>
+          <object class="tk.Frame" id="Frame_1">
+            <property name="height">5</property>
+            <property name="width">10</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="propagate">True</property>
+              <property name="row">6</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="tk.LabelFrame" id="FrameNumeric">
+            <property name="height">200</property>
+            <property name="text" translatable="yes">Sampling frequency</property>
+            <property name="width">200</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="columnspan">1</property>
+              <property name="propagate">True</property>
+              <property name="row">7</property>
+              <property name="rowspan">1</property>
+            </layout>
+            <child>
+              <object class="tk.Spinbox" id="SNumericFs">
+                <property name="from_">1</property>
+                <property name="increment">50</property>
+                <property name="state">normal</property>
+                <property name="takefocus">false</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="padx">30</property>
+                  <property name="pady">5</property>
+                  <property name="propagate">True</property>
+                  <property name="row">0</property>
+                </layout>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="tk.Frame" id="FrameBottom">
+        <property name="height">200</property>
+        <property name="width">200</property>
+        <layout manager="grid">
+          <property name="column">2</property>
+          <property name="columnspan">2</property>
+          <property name="pady">50</property>
+          <property name="propagate">True</property>
+          <property name="row">0</property>
+          <property name="rowspan">1</property>
+          <property name="sticky">s</property>
+        </layout>
+        <child>
+          <object class="ttk.Button" id="BPause">
+            <property name="text" translatable="yes">Pause</property>
+            <layout manager="grid">
+              <property name="column">1</property>
+              <property name="propagate">True</property>
+              <property name="row">0</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Button" id="BStart">
+            <property name="text" translatable="yes">Start</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="propagate">True</property>
+              <property name="row">0</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Button" id="BNext">
+            <property name="text" translatable="yes">Next</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="pady">5</property>
+              <property name="propagate">True</property>
+              <property name="row">1</property>
+            </layout>
+          </object>
+        </child>
+        <child>
+          <object class="ttk.Button" id="BReset">
+            <property name="text" translatable="yes">Reset</property>
+            <property name="textvariable">int:50</property>
+            <layout manager="grid">
+              <property name="column">1</property>
+              <property name="propagate">True</property>
+              <property name="row">1</property>
+            </layout>
+          </object>
+        </child>
+      </object>
+    </child>
+    <child>
+      <object class="ttk.Frame" id="FrameBottomRight">
+        <property name="height">200</property>
+        <property name="width">200</property>
+        <layout manager="grid">
+          <property name="column">2</property>
+          <property name="columnspan">1</property>
+          <property name="ipady">5</property>
+          <property name="padx">10</property>
+          <property name="propagate">True</property>
+          <property name="row">0</property>
+          <property name="rowspan">1</property>
+        </layout>
+        <child>
+          <object class="ttk.Labelframe" id="FrameStatistics">
+            <property name="height">200</property>
+            <property name="text" translatable="yes">Statistics</property>
+            <property name="width">200</property>
+            <layout manager="grid">
+              <property name="column">0</property>
+              <property name="propagate">True</property>
+              <property name="row">0</property>
+              <property name="sticky">n</property>
+              <property type="row" id="0" name="padx">5</property>
+            </layout>
+            <child>
+              <object class="ttk.Label" id="LATime">
+                <property name="text" translatable="yes">Analysis time</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="propagate">True</property>
+                  <property name="row">2</property>
+                  <property name="sticky">w</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Entry" id="ATime">
+                <property name="state">disabled</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="propagate">True</property>
+                  <property name="row">3</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Label" id="LAvrgAtime">
+                <property name="text" translatable="yes">Average analysis time</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="propagate">True</property>
+                  <property name="row">4</property>
+                  <property name="sticky">w</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Entry" id="Entry_1">
+                <property name="state">disabled</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="propagate">True</property>
+                  <property name="row">5</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="tk.Label" id="LAudioTime">
+                <property name="text" translatable="yes">Audio Time</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="ipadx">5</property>
+                  <property name="propagate">True</property>
+                  <property name="row">0</property>
+                  <property name="sticky">w</property>
+                </layout>
+              </object>
+            </child>
+            <child>
+              <object class="ttk.Label" id="LAudioTimeVal">
+                <property name="text" translatable="yes">0</property>
+                <layout manager="grid">
+                  <property name="column">0</property>
+                  <property name="propagate">True</property>
+                  <property name="row">1</property>
+                </layout>
+              </object>
+            </child>
+          </object>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
