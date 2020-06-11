@@ -176,7 +176,7 @@ class Intermediary:
     def start(self, event):
         """Start dispatching thread"""
 
-        if self.transform is None or self.play:
+        if self.transform is None or self.play or not self.const:
             return
         self.play = True
 #       Notify to start music and plotting
@@ -241,11 +241,13 @@ class Intermediary:
             self.const = True
         else:
             self.const = False
+            self.play = False
 
 #       Pause music if it's on and not constant operation mode is chosen
-        if self.const and self.singer is not None:
+        if not self.const and self.singer is not None:
 
-            self.singer.stop()
+            self.singer.terminate()
+            self.builder.get_object("CBSound").deselect()
 
     def sound_toggle(self, event):
         """Start/stop music playing thread"""
@@ -398,6 +400,12 @@ class Intermediary:
 
             self.builder.get_object("CBConst").deselect()
             self.const_toggle(None)
+            self.const = False
+            self.play = False
+
+        self.cv_play.acquire()
+        self.cv_play.notify()
+        self.cv_play.release()
 
 
 class Plotter(QMainWindow):
