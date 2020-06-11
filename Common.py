@@ -230,7 +230,7 @@ class AnalysisResultSaver(Base):
             elif t == self.SaveType.synthesis:
                 res = self.synthesis[self.s_row - back - 1, :]
             elif t == self.SaveType.time:
-                res = self.time[0, self.t_row - back - 1]
+                res = self.time[self.t_row - back - 1, 0]
 
         finally:
 

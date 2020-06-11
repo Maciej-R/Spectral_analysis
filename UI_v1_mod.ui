@@ -408,6 +408,7 @@
           <property name="row">0</property>
           <property name="rowspan">1</property>
           <property name="sticky">s</property>
+          <property name="padx">5</property>
         </layout>
         <child>
           <object class="ttk.Button" id="BPause">
@@ -477,11 +478,13 @@
               <property name="row">0</property>
               <property name="sticky">n</property>
               <property type="row" id="0" name="padx">5</property>
+              <property name="padx">5</property>
             </layout>
             <child>
               <object class="ttk.Label" id="LATime">
-                <property name="text" translatable="yes">Analysis time</property>
+                <property name="text" translatable="yes">Analysis duration [us]</property>
                 <layout manager="grid">
+                  <property name="padx">20</property>
                   <property name="column">0</property>
                   <property name="propagate">True</property>
                   <property name="row">2</property>
@@ -490,33 +493,12 @@
               </object>
             </child>
             <child>
-              <object class="ttk.Entry" id="ATime">
-                <property name="state">disabled</property>
+              <object class="ttk.Label" id="ADuration">
+                <property name="text" translatable="yes">0</property>
                 <layout manager="grid">
                   <property name="column">0</property>
                   <property name="propagate">True</property>
                   <property name="row">3</property>
-                </layout>
-              </object>
-            </child>
-            <child>
-              <object class="tk.Label" id="LAvrgAtime">
-                <property name="text" translatable="yes">Average analysis time</property>
-                <layout manager="grid">
-                  <property name="column">0</property>
-                  <property name="propagate">True</property>
-                  <property name="row">4</property>
-                  <property name="sticky">w</property>
-                </layout>
-              </object>
-            </child>
-            <child>
-              <object class="tk.Entry" id="Entry_1">
-                <property name="state">disabled</property>
-                <layout manager="grid">
-                  <property name="column">0</property>
-                  <property name="propagate">True</property>
-                  <property name="row">5</property>
                 </layout>
               </object>
             </child>
@@ -528,7 +510,6 @@
                   <property name="ipadx">5</property>
                   <property name="propagate">True</property>
                   <property name="row">0</property>
-                  <property name="sticky">w</property>
                 </layout>
               </object>
             </child>

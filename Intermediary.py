@@ -422,6 +422,7 @@ class Plotter(QMainWindow):
         Plotter.i = 0
         Plotter.log_mode(True, True)
         Plotter.AT = Intermediary.instance.ui.builder.get_object("LAudioTimeVal")
+        Plotter.AD = Intermediary.instance.ui.builder.get_object("ADuration")
         Plotter.max = 0
         qg.setConfigOption("foreground", "w")
 
@@ -460,6 +461,7 @@ class Plotter(QMainWindow):
 
 #       Display playback time
         Plotter.AT.configure(text=str(np.around(Intermediary.instance.transform.position_time(), 1)))
+        Plotter.AD.configure(text=str(np.around(Intermediary.instance.transform.getHistoryT()/1000, 1)))
 
     @staticmethod
     def log_mode(ax:bool=None, ay:bool=None, ticks=None):
