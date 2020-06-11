@@ -396,6 +396,7 @@ class Intermediary:
         if self.transform is None:
             return
 
+#       If was in constant mode make changes needed for single operation mode
         if self.const:
 
             self.builder.get_object("CBConst").deselect()
@@ -403,6 +404,7 @@ class Intermediary:
             self.const = False
             self.play = False
 
+#       Next frame
         self.cv_play.acquire()
         self.cv_play.notify()
         self.cv_play.release()
@@ -644,6 +646,7 @@ class Singer(threading.Thread):
 
         self.stop()
         self.termination = True
+#       Release lock so function can return
         self.condition.acquire()
         self.condition.notify()
         self.condition.release()

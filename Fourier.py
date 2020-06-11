@@ -52,6 +52,7 @@ class DtFT(Common.BaseAS):
         self.A /= np.sqrt(self.N)
 
     def reshape(self, N):
+        """Overriding because of constant frequency vector length. Change only number of samples"""
 
         old = self.N
         self.N = N

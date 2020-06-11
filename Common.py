@@ -95,6 +95,7 @@ class Base:
             self.trim = False
 
     def position_time(self):
+        """Return current time in signal"""
 
         return self.position / self.fs
 
