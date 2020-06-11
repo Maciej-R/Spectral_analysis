@@ -1,0 +1,13 @@
+Ramka General - wybór typu transformaty oraz ilości próbek na operację, wymaga potwierdzenia przyciskiem na dole
+Ramka Input file - przycisk po prawej otwiera menu wyboru pliku, pliki muzyczne wymagają formatu .wav, inne są traktowane jako numeryczne. Liczby powinny być oddzielane spację w formacie: 5 5.0 5e-1 5.
+Ramka Sampling frequency - w przypadku plików audio wyświetla wartość częstotliwości próbkowania, dla plików numerycznych pobiera wartość z tego pola, domyślne 1000 dla plików numerycznych
+Ramka Display - opcje wyświetlania. Przy skalowanie każdorazowo wykres jest skalowany od -M do M, gdzie M to maksymalna wartość bezwzględna z danych do wyświetlenia, dostępne dla liniowego skalowania, logarytmiczne wykresy są od 0 do 120, bez tego skala wykresu się zmienia gdy wartości będą większe niż 150% lub mniejsze niż 10% obecnej skali. "Trim frequencies" dla widma symetrycznego ucina je w połowie. Ostania opcja zmienia typ wykresu na słupkowy
+Ramka Sound - suwak ustawia głośność, aktualizacja jeżeli dźwięk jest odtwarzany wymaga ponownego zaznaczenia pola poniżej. "Constant play" zaznaczone - operacje przeprowadzane zgodnie z czasem odtwarzania utworu, tylko dla tego trybu działa odtwarzanie muzyki, jeżeli jest odznaczone to kolejne operacje są przeprowadzane po wciśnięciu "Next"
+Ramka Analysis - ustawianie tłumienie okna, włącznie/wyłączanie jego użycia. Przycisk potwierdza zmianę wartości
+Ramka Statistics - aktulany czas w utworze, czas potrzebny na przeprowadzenie ostatniej analizy
+Przycisk Start/Pause - uruchomienie/zatrzymanie
+Przycisk Reset - przywrócenie pierwotnego stanu
+Przycisk Next - analiza kolejnego fragmentu, wyłącza tryb ciągły i dźwięk
+
+Git: https://github.com/Maciej-R/Spectral_analysis
+Wymaga Qt oraz pyqtgraph
